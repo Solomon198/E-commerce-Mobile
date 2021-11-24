@@ -1,0 +1,154 @@
+{
+  "project_info": {
+    "project_number": "942864748198",
+    "project_id": "delivery-89fcb",
+    "storage_bucket": "delivery-89fcb.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:942864748198:android:92cc7b760a9cd87ecbee67",
+        "android_client_info": {
+          "package_name": "com.ash_magic_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "942864748198-oafbkf67dvn9rhvna1ls8ht089e593lj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB0gNi3Cz_urr1-YGe1F4ctFwO__j14oek"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "942864748198-oafbkf67dvn9rhvna1ls8ht089e593lj.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "942864748198-sc0bg1m3jise3qqgeaqs4e315gto3iqh.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.ash-magic-app"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:942864748198:android:ee1b27f1eb8391b4cbee67",
+        "android_client_info": {
+          "package_name": "com.campus_shoping"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "942864748198-oafbkf67dvn9rhvna1ls8ht089e593lj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB0gNi3Cz_urr1-YGe1F4ctFwO__j14oek"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "942864748198-oafbkf67dvn9rhvna1ls8ht089e593lj.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "942864748198-sc0bg1m3jise3qqgeaqs4e315gto3iqh.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.ash-magic-app"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:942864748198:android:d3c8822956e70631cbee67",
+        "android_client_info": {
+          "package_name": "com.dansako"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "942864748198-oafbkf67dvn9rhvna1ls8ht089e593lj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB0gNi3Cz_urr1-YGe1F4ctFwO__j14oek"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "942864748198-oafbkf67dvn9rhvna1ls8ht089e593lj.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "942864748198-sc0bg1m3jise3qqgeaqs4e315gto3iqh.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.ash-magic-app"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:942864748198:android:b5500ab31bf330edcbee67",
+        "android_client_info": {
+          "package_name": "com.dansako.driver"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "942864748198-oafbkf67dvn9rhvna1ls8ht089e593lj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB0gNi3Cz_urr1-YGe1F4ctFwO__j14oek"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "942864748198-oafbkf67dvn9rhvna1ls8ht089e593lj.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "942864748198-sc0bg1m3jise3qqgeaqs4e315gto3iqh.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.ash-magic-app"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
