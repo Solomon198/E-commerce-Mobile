@@ -31,7 +31,7 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   menuText: {
-    fontSize: 18,
+    fontSize: 15,
   },
   menuIcon: {
     color: Colors.Brand.brandColor,
@@ -107,27 +107,40 @@ class SideMenu extends React.Component<Props> {
         <View style={styles.flexContainer}>
           <ListItem
             onPress={() =>
-              this.navigate(NavigationScreens.PARCEL_MANAGER_SCREEN)
+              this.navigate(
+                NavigationScreens.PARCEL_DELIVERY_CUSTOMERS_ORDERS_SCREEN,
+              )
             }
             style={styles.menuItems}>
             <Icon
               style={styles.menuIcon}
-              type="MaterialIcons"
-              name="drive-eta"
+              name="people-carry"
+              type="FontAwesome5"
             />
             <Body>
-              <Text style={styles.menuText}>Drive history</Text>
+              <Text style={styles.menuText}>Customers Orders</Text>
             </Body>
           </ListItem>
 
           <ListItem
             onPress={() =>
-              this.navigate(NavigationScreens.PAYMENT_OPTION_SCREEN)
+              this.navigate(NavigationScreens.PARCEL_DELIVERY_MY_ORDERS_SCREEN)
             }
             style={styles.menuItems}>
-            <Icon style={styles.menuIcon} type="FontAwesome5" name="coins" />
+            <Icon style={styles.menuIcon} name="shopping-cart" type="Feather" />
             <Body>
-              <Text style={styles.menuText}>Payments</Text>
+              <Text style={styles.menuText}>My Orders</Text>
+            </Body>
+          </ListItem>
+
+          <ListItem
+            onPress={() =>
+              this.navigate(NavigationScreens.PARCEL_MANAGER_SCREEN)
+            }
+            style={styles.menuItems}>
+            <Icon style={styles.menuIcon} name="th-list" type="FontAwesome" />
+            <Body>
+              <Text style={styles.menuText}>My Items</Text>
             </Body>
           </ListItem>
 

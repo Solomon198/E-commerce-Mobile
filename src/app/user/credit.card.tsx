@@ -18,14 +18,39 @@ import {
   Left,
 } from 'native-base';
 import Colors from '../../configs/styles/index';
+import firestore from '@react-native-firebase/firestore';
 import {Navigation} from 'react-native-navigation';
-import {connect} from 'react-redux';
+import {batch, connect} from 'react-redux';
 import {LiteCreditCardInput} from 'react-native-credit-card-input';
 import NavigationScreens from '../../../nav.config/navigation.screens';
-import {AddCreditCard, inputActionType} from '../../configs/global.enum';
+import {
+  AddCreditCard,
+  inputActionType,
+  PaymentSuccess,
+} from '../../configs/global.enum';
 import * as joi from 'react-native-joi';
 import SpinKit from 'react-native-spinkit';
 import User from '../types/user';
+import {formatAmountWithComma} from '../utilities/helper.funcs';
+// @ts-ignore
+import RNPaystack from 'react-native-paystack';
+
+RNPaystack.init({
+  publicKey: 'pk_test_7bad3f89963baf08caed993b86a42165b222d6a5',
+});
+
+const Pay = async (payload: any) => {
+  const {cvc, email, number, expiry, amount} = payload;
+  const [month, year] = expiry.split('/');
+  return RNPaystack.chargeCard({
+    cardNumber: number.split(' ').join(''),
+    expiryMonth: month,
+    expiryYear: year,
+    cvc: cvc,
+    email: email,
+    amountInKobo: amount * 100,
+  });
+};
 
 const validateEmail = joi.object({
   email: joi.string().email().required(),
@@ -76,10 +101,12 @@ type Props = {
   cardEmail: string;
   addCreditCardStatus: string;
   addCreditCardError: string;
+  carts: any[];
   user: User;
   setCardEmail: (email: string) => void;
   addCard: (card: any) => void;
   enableAddCreditCardButton: (payload: boolean) => void;
+  paymentSuccess: () => void;
 };
 
 const mapStateToProps = (store: any) => ({
@@ -89,6 +116,7 @@ const mapStateToProps = (store: any) => ({
   addCardEnabled: store.User.addCardEnabled,
   user: store.Auth.user,
   cardEmail: store.User.cardEmail,
+  carts: store.User.carts,
 });
 
 const mapDispatchStateToProps = (dispatch: any) => ({
@@ -98,11 +126,15 @@ const mapDispatchStateToProps = (dispatch: any) => ({
     dispatch({type: 'DO-ENABLE-ADD-BUTTON', payload: payload}),
   setCardEmail: (email: string) =>
     dispatch({type: inputActionType.SET_CARD_EMAIL, payload: email}),
+  paymentSuccess: () => dispatch({type: PaymentSuccess.PAYMENT_CALLER}),
 });
 
 class CreditCard extends React.Component<Props> {
   state = {
+    email: '',
     error: '',
+    addCardEnabled: false,
+    isPaying: false,
   };
   searchPickUp() {
     Navigation.push(this.props.componentId, {
@@ -140,37 +172,36 @@ class CreditCard extends React.Component<Props> {
 
   addCard(card: any) {
     Keyboard.dismiss();
-    const {error} = validateEmail.validate({email: this.props.cardEmail});
+    const {error} = validateEmail.validate({email: this.state.email});
     if (error) {
       return this.setState({error: error.details[0].message});
     }
-    if (!this.props.userCards) {
-      return this.props.addCard({
-        ...card,
-        email: this.props.cardEmail,
-        userId: this.props.user.userId,
-      });
-    }
-    let cardAlreadyAdded = false;
-    this.props.userCards.forEach((item) => {
-      if (card.number.split(' ').join('') === item.cardNumber) {
-        cardAlreadyAdded = true;
-      }
-    });
 
-    if (!cardAlreadyAdded) {
-      this.props.addCard({
-        ...card,
-        email: this.props.cardEmail,
-        userId: this.props.user.userId,
-      });
-      return;
-    } else {
-      Alert.alert(
-        'Card Already Used',
-        'This card have been added to your card list',
-      );
-    }
+    this.setState({isPaying: true});
+
+    Pay({
+      ...card,
+      email: this.state.email,
+      amount: (this.getTotalSum() * 100).toString(),
+    })
+      .then((result) => {
+        const batch = firestore().batch();
+        this.props.carts.forEach((item) => {
+          const docREf = firestore().collection('Orders').doc();
+          batch.set(docREf, {
+            ...item,
+            customerId: this.props.user.userId,
+            customer: this.props.user,
+            status: 'NOT-DELIVERED',
+            sellerId: item.userId.userId,
+          });
+        });
+        batch.commit().then(() => {
+          this.props.paymentSuccess();
+          Navigation.popToRoot(this.props.componentId);
+        });
+      })
+      .catch((e) => console.log(e));
   }
 
   validateCard(value: any) {
@@ -181,10 +212,22 @@ class CreditCard extends React.Component<Props> {
         cvc: value.values.cvc,
         expiry: value.values.expiry,
       };
-      this.props.enableAddCreditCardButton(true);
+      this.enableAddCreditCardButton(true);
     } else {
-      this.props.enableAddCreditCardButton(false);
+      this.enableAddCreditCardButton(false);
     }
+  }
+
+  enableAddCreditCardButton(status: boolean) {
+    this.setState({addCardEnabled: status});
+  }
+
+  getTotalSum() {
+    let total: number = 0;
+    this.props.carts.forEach((item) => {
+      total += parseInt(item.price) * item.count; // eslint-disable-line
+    });
+    return total;
   }
 
   render() {
@@ -201,6 +244,7 @@ class CreditCard extends React.Component<Props> {
           </Left>
           <Body />
         </Header>
+
         <View style={styles.mainContainerSub}>
           <H1 style={styles.pageTitle}>Credit Card</H1>
           {this.state.error || this.props.addCreditCardError ? (
@@ -221,11 +265,11 @@ class CreditCard extends React.Component<Props> {
           />
           <View>
             <TextInput
-              value={this.props.cardEmail}
+              value={this.state.email}
               style={styles.input}
               placeholder="Email Address"
               onChangeText={(text) => {
-                this.props.setCardEmail(text);
+                this.setState({email: text});
                 this.setState({error: ''});
               }}
             />
@@ -234,30 +278,27 @@ class CreditCard extends React.Component<Props> {
         <View style={styles.flexContainer} />
         <View style={styles.noteChargesContainer}>
           <Text style={styles.noteChargesText}>
-            Dan sako will charge your account #50 a small amount to confirm your
-            card details. this amount will serve as discount for your first
-            delivery when you use the card.
+            {' '}
+            Note your account will be charged ₦
+            {formatAmountWithComma(this.getTotalSum())},
           </Text>
-          <Text style={styles.learnMoreText}>Learn More</Text>
+          <Text> which is the amount for the items selected in the cart.</Text>
         </View>
 
         <Text />
         <Button
           onPress={() => this.addCard(this.validCard)}
-          disabled={
-            !this.props.addCardEnabled ||
-            this.props.addCreditCardStatus ===
-              AddCreditCard.ADD_CREDEIT_CARD_STARTED
-          }
+          disabled={!this.state.addCardEnabled || this.state.isPaying}
           iconLeft
           large
           rounded
           block
           style={[
             {
-              backgroundColor: this.props.addCardEnabled
-                ? Colors.Brand.brandColor
-                : Colors.Brand.getBrandColorByOpacity(0.4),
+              backgroundColor:
+                this.state.addCardEnabled || !this.state.isPaying
+                  ? Colors.Brand.brandColor
+                  : Colors.Brand.getBrandColorByOpacity(0.4),
             },
             styles.btnAddCard,
           ]}>
@@ -267,10 +308,9 @@ class CreditCard extends React.Component<Props> {
             name="credit-card"
           />
           <Text uppercase={false} style={styles.addCardText}>
-            Add Card
+            Pay
           </Text>
-          {this.props.addCreditCardStatus ===
-            AddCreditCard.ADD_CREDEIT_CARD_STARTED && (
+          {this.state.isPaying === true && (
             <SpinKit type="Circle" color="#fff" />
           )}
         </Button>

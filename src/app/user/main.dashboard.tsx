@@ -1,51 +1,50 @@
 import React from 'react';
-import {View, StyleSheet, Keyboard, Image, Alert, Modal} from 'react-native';
+import {
+  RefreshControl,
+  StyleSheet,
+  FlatList,
+  Modal,
+  TouchableOpacity,
+} from 'react-native';
 import {
   Container,
   Input,
-  Item,
-  Body,
-  H3,
   Fab,
-  Text,
   Icon,
-  Button,
   ListItem,
   Left,
   H1,
+  Button,
+  Text as NativeBaseText,
 } from 'native-base';
-import Colors from '../../configs/styles/index';
+import Brand from '../../configs/styles/index';
 import {toggleSideMenu} from './navigations.actions';
-import MapView, {PROVIDER_GOOGLE, Marker} from 'react-native-maps'; // remove PROVIDER_GOOGLE import if not using Google Maps
-import Geolocation from 'react-native-geolocation-service';
 import {Navigation} from 'react-native-navigation';
-import Utils from '../utilities/index';
 import {connect} from 'react-redux';
 import SpinKit from 'react-native-spinkit';
-import {FlatList} from 'react-native-gesture-handler';
 import {
   cancelDeliveryActionType,
   confirmDeliveryActionType,
   currentLocation,
+  GetCategories,
+  GetFeeds,
   inputActionType,
+  Post,
   setLocation,
+  AddCart,
 } from '../../configs/global.enum';
-import MapViewDirections from 'react-native-maps-directions';
 import NavigationScreens from '../../../nav.config/navigation.screens';
-import {firebasePaths, ParcelStatus} from '../../configs/globals.config';
-import firestore from '@react-native-firebase/firestore';
-import {Avatar} from 'react-native-ui-lib';
 import User from '../types/user';
 import {Driver} from '../types/driver';
-import {API_KEY} from 'react-native-dotenv';
-import crashlytics from '@react-native-firebase/crashlytics';
-import {
-  Notifications,
-  Registered,
-  RegistrationError,
-  NotificationCompletion,
-  Notification,
-} from 'react-native-notifications';
+
+import _ from 'lodash';
+import {ScrollView} from 'react-native';
+import {Colors, View, Card, Text} from 'react-native-ui-lib';
+// @ts-ignore
+import posts from '../user/_mock_data_/posts';
+import {formatAmountWithComma} from '../utilities/helper.funcs';
+import {Picker} from 'react-native-ui-lib';
+import {TextInput} from 'react-native-gesture-handler';
 
 const mapStateToProps = (store: any) => ({
   currentLocationPrediction: store.User.currentLocation,
@@ -57,6 +56,12 @@ const mapStateToProps = (store: any) => ({
   confirmDeliveryStatus: store.User.confirmDeliveryStatus,
   watchPosition: store.User.watchPosition,
   deliveryDeleted: store.User.deliveryDeleted,
+  page: store.User.page,
+  feeds: store.User.feeds,
+  feedStatus: store.User.feedStatus,
+  hasNextPage: store.User.hasNextPage,
+  categories: store.User.categories,
+  carts: store.User.carts,
 });
 
 const mapDispatchStateToProps = (dispatch: any) => ({
@@ -89,6 +94,11 @@ const mapDispatchStateToProps = (dispatch: any) => ({
       type: inputActionType.SET_USER_CURRENT_LOCATION_CALLER,
       payload: location,
     }),
+  getCategories: () => dispatch({type: GetCategories.GET_CATEGORIES_CALLER}),
+  getFeeds: (queryParams: any, isRefresh?: boolean) =>
+    dispatch({type: GetFeeds.GET_FEEDS_CALLER, queryParams, isRefresh}),
+  addToCart: (payload: any, isAdding: boolean) =>
+    dispatch({type: AddCart.ADD_TO_CART_CALLER, payload, isAdding}),
 });
 
 type currentLocationObj = {
@@ -113,7 +123,6 @@ type parcelInProgress = {
   driver: any;
   id: string;
 };
-
 type coords = {longitude: number; latitude: number};
 
 type Props = {
@@ -127,12 +136,15 @@ type Props = {
   confirmDeliveryStatus: string;
   watchPosition: coords;
   deliveryDeleted: boolean;
-  getCurrentLocation: () => void;
-  selectedLocation: (location: any) => void;
-  setActiveDelivery: (payload: any, driver: any, discard?: boolean) => void;
-  cancelDelivery: (parcelId: string) => void;
-  confirmDelivery: (parcelId: string) => void;
-  setCurrentLocation: (payload: coords) => void;
+  page: number;
+  feeds: any[];
+  feedStatus: string;
+  categories: any[];
+  hasNextPage: boolean;
+  carts: any[];
+  getFeeds: (queryParams: any, isRefresh?: boolean) => void;
+  addToCart: (payload: any, isAdding: boolean) => void;
+  getCategories: () => void;
 };
 
 const styles = StyleSheet.create({
@@ -149,7 +161,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   retryBtn: {
-    backgroundColor: Colors.Brand.brandColor,
+    backgroundColor: Brand.Brand.brandColor,
     marginHorizontal: 10,
     marginVertical: 10,
   },
@@ -157,7 +169,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   currentLocationSelect: {
-    backgroundColor: Colors.Brand.brandColor,
+    backgroundColor: Brand.Brand.brandColor,
     marginVertical: 10,
     borderColor: 'transparent',
   },
@@ -202,11 +214,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   header: {
-    backgroundColor: Colors.Brand.brandColor,
+    backgroundColor: Brand.Brand.brandColor,
     zIndex: 2000,
   },
   btnMenu: {
-    backgroundColor: Colors.Brand.brandColor,
+    backgroundColor: Brand.Brand.brandColor,
     width: 50,
     height: 50,
     borderRadius: 100,
@@ -227,7 +239,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 12,
     fontWeight: 'bold',
-    color: Colors.Brand.brandColor,
+    color: Brand.Brand.brandColor,
   },
   left: {
     maxWidth: 30,
@@ -259,9 +271,9 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 10,
   },
-  icoDanger: {color: Colors.Brand.danger},
-  icoWarning: {color: Colors.Brand.warning},
-  icoSuccess: {color: Colors.Brand.success},
+  icoDanger: {color: Brand.Brand.danger},
+  icoWarning: {color: Brand.Brand.warning},
+  icoSuccess: {color: Brand.Brand.success},
   fabCancelDelivery: {backgroundColor: '#d9534f', zIndex: 100000},
   icoWhite: {color: '#fff'},
   fabSuccessDelivery: {backgroundColor: '#5cb85c', zIndex: 100000},
@@ -290,692 +302,518 @@ const styles = StyleSheet.create({
   },
 });
 
+type CardsScreenProps = {};
+type CardsScreenState = {
+  selected1: boolean;
+  selected2: boolean;
+};
+
 class Dashboard extends React.Component<Props> {
-  watchId: any;
-  timer: any;
-  mapRef: any;
-  driverInfo: any;
-  trackerListener: any;
-  activeDeliveries = firestore()
-    .collection(firebasePaths.ACTIVE_DELIVERIES)
-    .where('parcelOwner', '==', this.props.user.userId);
-
-  rideHistories = firestore().collection(firebasePaths.PARCEL_HISTORIES);
-  driver = firestore().collection(firebasePaths.DRIVERS);
-  watchDriver: any;
-
-  //gets the current location of the user
-  async getCurrentPosition() {
-    const permission = await Utils.Permissions.RequestLocationPermissions();
-    if (!permission) {
-      Alert.alert(
-        '',
-        'Location Access not granted. Allow application to access location.',
-      );
-      return false;
-    }
-    this.watchId = Geolocation.watchPosition(
-      (position) => {
-        const {latitude, longitude} = position.coords;
-        this.props.setCurrentLocation({
-          latitude: latitude,
-          longitude: longitude,
-        });
-      },
-      (e) => {
-        crashlytics().log('error getting user coords');
-        crashlytics().recordError(new Error(e.message));
-        this.getCurrentPosition();
-      },
-      {enableHighAccuracy: true},
-    );
+  state = {
+    category: {value: '', label: ''},
+    showModal: false,
+    budget: 0,
+    showCart: false,
+  };
+  componentDidMount() {
+    this.props.getCategories();
+    this.props.getFeeds({pageSize: 10, pageNumber: 1}, true);
   }
 
-  //accepst array of longitude and latitude and object and fit all coords on the mapview
-  callFit(...locations: any[]) {
-    if (!this.mapRef) {
-      return false;
-    }
-
-    if (
-      locations[0].longitude === this.props.watchPosition.longitude &&
-      locations[0].latitude === this.props.watchPosition.latitude
-    ) {
-      return false;
-    }
-
-    this.mapRef.fitToCoordinates(locations, {
-      edgePadding: {
-        bottom: 200,
-        right: 50,
-        top: 150,
-        left: 50,
-      },
-      animated: false,
+  getTotalSum() {
+    let total: number = 0;
+    this.props.carts.forEach((item) => {
+      total += parseInt(item.price) * item.count; // eslint-disable-line
     });
+    return total;
   }
 
-  componentDidUpdate() {
-    if (this.props.activeDelivery) {
-      let timer = setTimeout(() => {
-        this.callFit(
-          this.getActiveDeliveryPickUpLocation(),
-          this.getActiveDeliveryDestinationLocation(),
-        );
-        clearTimeout(timer);
-      }, 500);
-    }
-
-    if (!this.watchId) {
-      this.getCurrentPosition();
-    }
-  }
-
-  searchPickUp() {
-    Navigation.push(this.props.componentId, {
-      component: {
-        name: NavigationScreens.SEARCH_PICKUP_SCREEN,
-        id: NavigationScreens.SEARCH_PICKUP_SCREEN,
-        passProps: {
-          parcel: this.props.activeDelivery,
-          reAssigning: true,
-        },
-      },
+  getTotalAmountInCart() {
+    let count: number = 0;
+    const carts = this.props.carts || [];
+    carts.forEach((item) => {
+      count += item.count;
     });
+    return count;
   }
 
-  handleDialogCancelDelivery() {
-    Alert.alert(
-      '',
-      'Are you sure you want to discard delivery request settings?',
-      [
-        {
-          onPress: () => this.props.setActiveDelivery(null, null, true),
-
-          text: 'Yes',
-        },
-        {
-          onPress: () => '',
-
-          text: 'No',
-        },
-      ],
-    );
-  }
-  //gets the coords for activeDelivery pickup location
-  getActiveDeliveryDestinationLocation() {
-    if (this.props.activeDelivery) {
-      return {
-        longitude: this.props.activeDelivery.parcelDestination[0],
-        latitude: this.props.activeDelivery.parcelDestination[1],
-      };
-    }
-    return {
-      longitude: this.props.watchPosition.longitude,
-      latitude: this.props.watchPosition.latitude,
-    };
-  }
-
-  //gets the coords for activeDelivery destination location
-  getActiveDeliveryPickUpLocation() {
-    if (this.props.activeDelivery) {
-      return {
-        latitude: this.props.activeDelivery.parcelLocation[1],
-        longitude: this.props.activeDelivery.parcelLocation[0],
-      };
-    }
-
-    return {
-      longitude: this.props.watchPosition.longitude,
-      latitude: this.props.watchPosition.latitude,
-    };
-  }
-
-  //gets the driver information when delivery enters the active mode and handles both failure and success to avoid multiple redundant reads
-  async getDriverInfo(parcel: parcelInProgress) {
-    try {
-      if (!parcel) {
-        this.props.setActiveDelivery(null, null);
-        this.getCurrentPosition();
-      } else {
-        if (this.props.driver) {
-          this.props.setActiveDelivery(parcel, this.props.driver);
-        } else {
-          let driver = await this.driver.doc(parcel.parcelPicker).get();
-          let data = driver.data();
-          if (data) {
-            data.id = driver.id;
-          }
-          this.props.setActiveDelivery(parcel, data);
-        }
-      }
-    } catch (e) {
-      crashlytics().recordError(e);
-    }
-  }
-
-  //watch drivers location when a trip is going on
-  watchDriverLocation(driverId: any, parcel: any) {
-    if (driverId && parcel) {
-      if (!this.watchDriver) {
-        this.watchDriver = this.driver.doc(driverId).onSnapshot((snapshot) => {
-          let data = snapshot.data();
-          if (data) {
-            data.id = snapshot.id;
-          }
-          this.props.setActiveDelivery(parcel, data);
-        });
-      }
-    } else {
-      if (this.watchDriver) {
-        this.watchDriver();
-      }
-    }
-  }
-
-  async getDeviceRegToken() {
-    Notifications.registerRemoteNotifications();
-
-    Notifications.events().registerRemoteNotificationsRegistered(
-      (event: Registered) => {
-        // TODO: Send the token to my server so it could send back push notifications...
-        this.saveToken(event.deviceToken);
-      },
-    );
-    Notifications.events().registerRemoteNotificationsRegistrationFailed(
-      (event: RegistrationError) => {
-        crashlytics().recordError(new Error(event.localizedDescription));
-      },
-    );
-  }
-
-  registerNotificationListeners() {
-    Notifications.events().registerNotificationReceivedForeground(
-      (
-        notification: Notification,
-        completion: (response: NotificationCompletion) => void,
-      ) => {
-        crashlytics().log('Notification Received - Foreground');
-        // Calling completion on iOS with `alert: true` will present the native iOS inApp notification.
-        completion({alert: true, sound: true, badge: false});
-      },
-    );
-
-    Notifications.events().registerNotificationReceivedBackground(
-      (notification: any, completion: (response: any) => void) => {
-        crashlytics().log('Notification recieved');
-        // Calling completion on iOS with `alert: true` will present the native iOS inApp notification.
-        completion({alert: true, sound: true, badge: false});
-      },
-    );
-  }
-
-  //mounts the current component
-  async componentDidMount() {
-    this.registerNotificationListeners();
-    this.trackerListener = this.activeDeliveries.onSnapshot((valz) => {
-      if (!valz.empty) {
-        let doc: parcelInProgress[] = [];
-        valz.forEach((val) => {
-          let obj = val.data();
-          obj.id = val.id;
-          doc.push(obj as any);
-        });
-        this.getDriverInfo(doc[0]);
-        this.watchDriverLocation(doc[0].parcelPicker, doc[0]);
-      } else {
-        this.getDriverInfo(null as any);
-        this.watchDriverLocation(null, null);
+  getItemCount(id: any) {
+    let count = 0;
+    this.props.carts.forEach((item) => {
+      if (item.postId == id) {
+        count = item.count;
       }
     });
-    if (!this.props.activeDelivery) {
-      this.props.getCurrentLocation();
-    }
-    this.getDeviceRegToken();
-    try {
-      this.getCurrentPosition();
-    } catch (e) {
-      crashlytics().recordError(e);
-    }
+
+    return count;
   }
 
-  //unsubscribe to all component
-  componentWillUnmount() {
-    try {
-      Keyboard.dismiss();
-      this.trackerListener();
-    } catch (e) {
-      crashlytics().recordError(e);
-    }
-    if (this.watchId) {
-      Geolocation.clearWatch(this.watchId);
-      this.watchId = null;
-    }
-  }
-
-  navigate(name: string) {
-    Navigation.push(this.props.componentId, {
-      component: {
-        name: name,
-        passProps: {
-          longitude: this.props.watchPosition.longitude,
-          latitude: this.props.watchPosition.latitude,
-        },
-      },
-    });
-  }
-
-  setLocation(location: any) {
-    this.props.selectedLocation(location);
-
-    this.timer = setTimeout(() => {
-      if (this.timer) {
-        clearTimeout(this.timer);
-      }
-
-      this.navigate(NavigationScreens.CREATE_PARCEL_SCREEN);
-      clearTimeout(this.timer);
-    }, 500);
-  }
-
-  cancelDelivery(parcelId: string) {
-    Alert.alert('', 'Are you sure you want to cancel pickup ? ', [
-      {onPress: () => this.props.cancelDelivery(parcelId), text: 'Confirm'},
-      {onPress: () => '', text: 'Cancel'},
-    ]);
-  }
-
-  confirmDelivery(parcelId: string) {
-    Alert.alert(
-      '',
-      'Are you sure you want to confirm parcel have been delivered ? ',
-      [
-        {onPress: () => this.props.confirmDelivery(parcelId), text: 'Confirm'},
-        {onPress: () => '', text: 'Cancel'},
-      ],
-    );
-  }
-  renderConfirmingDelivery() {
-    const visible =
-      this.props.confirmDeliveryStatus ===
-      confirmDeliveryActionType.CONFIRM_DELIVERY_STARTED;
+  renderCart() {
     return (
-      <Modal visible={visible} style={styles.modal}>
-        <View style={styles.modalSubContainer}>
-          <SpinKit type="Circle" size={190} color={Colors.Brand.brandColor} />
-          <H1 style={styles.available}>Confirming Delivery ... </H1>
+      <Modal
+        visible={this.state.showCart}
+        onRequestClose={() => this.setState({showCart: false})}
+        style={{flex: 1, backgroundColor: '#fff'}}>
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginHorizontal: 10,
+          }}>
+          <Icon style={{color: 'gray'}} type="Feather" name="shopping-cart" />
+
+          <TouchableOpacity
+            onPress={() => this.setState({showCart: false})}
+            style={{
+              width: 60,
+              height: 60,
+              borderRadius: 100,
+              justifyContent: 'center',
+              alignItems: 'center',
+              backgroundColor: 'whitesmoke',
+              margin: 10,
+              alignSelf: 'flex-end',
+            }}>
+            <Icon name="close" />
+          </TouchableOpacity>
+        </View>
+        <FlatList
+          ListEmptyComponent={
+            <View
+              style={{
+                marginTop: 20,
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}>
+              <Text style={{fontWeight: 'bold', marginTop: 150}}>
+                OOps there are no items !!
+              </Text>
+            </View>
+          }
+          data={this.props.carts}
+          renderItem={({item, index}) => (
+            <Card
+              key={index}
+              style={{marginBottom: 15, marginHorizontal: 5}}
+              onPress={() => console.log('press on a card')}>
+              <Card.Section
+                imageSource={{uri: item.coverImage}}
+                imageStyle={{height: 270}}
+              />
+
+              <View padding-15 bg-white>
+                <Text text60 color={Colors.grey10}>
+                  {item.title}
+                </Text>
+
+                <Text
+                  marginT
+                  numberOfLines={3}
+                  ellipsizeMode="tail"
+                  text80
+                  color={Colors.grey10}>
+                  {item.description}
+                </Text>
+              </View>
+              <View
+                row
+                style={{
+                  marginBottom: 10,
+                  marginHorizontal: 20,
+                  alignItems: 'center',
+                }}>
+                <Text
+                  style={{fontWeight: 'bold', marginRight: 10, fontSize: 25}}>
+                  ₦{formatAmountWithComma(item.price)}
+                </Text>
+                <View style={{flexDirection: 'row'}}>
+                  <Button
+                    rounded
+                    onPress={() => this.props.addToCart(item, true)}
+                    style={{paddingVertical: 15, paddingHorizontal: 8}}
+                    small
+                    success
+                    iconLeft
+                    bordered>
+                    <Icon type="Feather" name="shopping-cart" />
+                    <Text style={{fontSize: 20, marginLeft: 10}}>+</Text>
+                  </Button>
+                  <Button
+                    onPress={() => this.props.addToCart(item, false)}
+                    rounded
+                    style={{
+                      paddingVertical: 15,
+                      paddingHorizontal: 8,
+                      marginLeft: 10,
+                    }}
+                    small
+                    success
+                    iconLeft
+                    bordered>
+                    <Icon type="Feather" name="shopping-cart" />
+                    <Text style={{fontSize: 20, marginLeft: 10}}>-</Text>
+                  </Button>
+                  <View
+                    style={{
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      height: 30,
+                      width: 30,
+                      marginLeft: 10,
+                      borderColor: 'lightgray',
+                      borderWidth: 1,
+                      borderRadius: 100,
+                    }}>
+                    <Text style={{fontWeight: 'bold'}}>
+                      {this.getItemCount(item.postId)}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </Card>
+          )}
+        />
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'space-around',
+            paddingVertical: 10,
+          }}>
+          <View>
+            <Text style={{fontSize: 30, fontWeight: 'bold', color: '#444'}}>
+              ₦{formatAmountWithComma(this.getTotalSum())}
+            </Text>
+          </View>
+          <Button
+            onPress={() =>
+              this.setState(
+                {
+                  showCart: false,
+                },
+                () => {
+                  Navigation.push(this.props.componentId, {
+                    component: {
+                      id: NavigationScreens.CREDIT_CARD,
+                      name: NavigationScreens.CREDIT_CARD,
+                    },
+                  });
+                },
+              )
+            }
+            style={{borderRadius: 10}}
+            rounded
+            disabled={this.props.carts.length < 1}
+            light>
+            <NativeBaseText uppercase={false}>Checkout</NativeBaseText>
+          </Button>
         </View>
       </Modal>
     );
   }
 
-  renderCancelingPickUp() {
-    const visible =
-      this.props.cancelDeliveryStatus ===
-      cancelDeliveryActionType.CANCEL_DELIVERY_STARTED;
+  renderModal() {
+    const formatCategories = this.props.categories.map((category) => ({
+      label: category.name,
+      value: category.categoryId,
+    }));
     return (
-      <Modal visible={visible} style={styles.modal}>
-        <View style={styles.modalSubContainer}>
-          <SpinKit type="Circle" size={190} color={Colors.Brand.brandColor} />
-          <H1 style={styles.available}>Canceling Pickup ... </H1>
+      <Modal
+        visible={this.state.showModal}
+        onRequestClose={() => this.setState({showModal: false})}
+        animationType="slide">
+        <TouchableOpacity
+          onPress={() => this.setState({showModal: false})}
+          style={{
+            width: 60,
+            height: 60,
+            borderRadius: 100,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: 'whitesmoke',
+            margin: 10,
+            alignSelf: 'flex-end',
+          }}>
+          <Icon name="close" />
+        </TouchableOpacity>
+        <View
+          style={{
+            justifyContent: 'center',
+            alignItems: 'center',
+            flex: 1,
+            padding: 20,
+          }}>
+          <Text style={{fontSize: 20, fontWeight: 'bold', color: '#888'}}>
+            Search by Category and budget
+          </Text>
+          <Text style={{marginTop: 3, color: '#444'}}>
+            you can get anything you want base on what you are looking for and
+            how much money you have, lets go!
+          </Text>
+          <View style={{flexGrow: 1, marginHorizontal: 10, marginTop: 15}}>
+            <Picker
+              placeholder="Filter by category "
+              floatingPlaceholder
+              value={this.state.category}
+              style={{marginLeft: 20, width: '100%'}}
+              enableModalBlur={false}
+              onChange={(item) => this.setState({category: item})}
+              topBarProps={{title: 'Categories'}}
+              showSearch
+              searchPlaceholder={'Search a category'}
+              searchStyle={{
+                color: Colors.blue30,
+                placeholderTextColor: Colors.grey50,
+              }}>
+              {_.map(formatCategories, (option) => (
+                <Picker.Item
+                  key={option.value}
+                  value={option}
+                  disabled={false}
+                />
+              ))}
+            </Picker>
+
+            <TextInput
+              keyboardType="numeric"
+              value={this.state.budget + ''}
+              onChangeText={(text) => this.setState({budget: text})}
+              style={{
+                borderBottomColor: 'lightgray',
+                borderBottomWidth: 1,
+                borderRadius: 10,
+              }}
+              placeholder="Filter by price"
+            />
+
+            <Button
+              onPress={() => {
+                this.setState({showModal: false}, () => {
+                  const $queryParams: any = {
+                    pageSize: 1000,
+                    pageNumber: 1,
+                    category: this.state.category.value,
+                  };
+                  /* eslint-disable */
+                  if (parseInt(this.state.budget + '') > 0) {
+                    $queryParams['budget'] = this.state.budget;
+                  }
+                  this.props.getFeeds($queryParams, true);
+                });
+              }}
+              block
+              light
+              style={{borderRadius: 10, marginTop: 40}}>
+              <NativeBaseText>Search</NativeBaseText>
+            </Button>
+          </View>
+          <View style={{flex: 1, marginRight: 5}}></View>
         </View>
       </Modal>
     );
-  }
-
-  async saveToken(token: string) {
-    let admin = firestore()
-      .collection(firebasePaths.USERS)
-      .doc(this.props.user.userId);
-    admin
-      .set({
-        token: firestore.FieldValue.arrayUnion(token),
-        photo: this.props.user.photo,
-        firstName: this.props.user.firtName,
-        lastName: this.props.user.lastName,
-      })
-      .catch((e) => {
-        crashlytics().recordError(e);
-      });
   }
 
   render() {
+    const isLoading = this.props.feedStatus === GetFeeds.GET_FEEDS_STARTED;
+    this.props.feeds.forEach((val, index) => {
+      console.log(
+        index,
+        '=-==========================================================================',
+      );
+      console.log(val);
+    });
     return (
       <Container style={styles.mainContainer}>
-        {this.renderCancelingPickUp()}
-        {this.renderConfirmingDelivery()}
-        <View style={styles.container}>
-          <MapView
-            ref={(ref) => (this.mapRef = ref)}
-            provider={PROVIDER_GOOGLE} // remove if not using Google Maps
-            style={styles.map}
-            region={{
-              latitude: this.props.activeDelivery
-                ? this.props.activeDelivery.parcelLocation[1]
-                : this.props.watchPosition.latitude,
-
-              longitude: this.props.activeDelivery
-                ? this.props.activeDelivery.parcelLocation[0]
-                : this.props.watchPosition.longitude,
-              latitudeDelta: 0.015,
-              longitudeDelta: 0.0121,
+        {this.renderModal()}
+        {this.renderCart()}
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'flex-end',
+            alignItems: 'center',
+            margin: 10,
+          }}>
+          <Button
+            style={{
+              paddingVertical: 15,
+              paddingHorizontal: 8,
+              marginRight: 20,
+              paddingRight: 10,
+            }}
+            onPress={() => this.setState({showCart: true})}
+            success
+            bordered
+            rounded
+            icon>
+            <Icon type="Feather" name="shopping-cart" />
+            <Text style={{marginLeft: -10, fontWeight: 'bold'}}>
+              {this.getTotalAmountInCart()}
+            </Text>
+          </Button>
+          <Button
+            light
+            bordered
+            onPress={() => this.setState({showModal: true})}
+            rounded
+            style={{
+              zIndex: 1000,
             }}>
-            {this.props.activeDelivery && (
-              <>
-                <MapViewDirections
-                  origin={this.getActiveDeliveryPickUpLocation()}
-                  destination={this.getActiveDeliveryDestinationLocation()}
-                  apikey={API_KEY}
-                  strokeWidth={3}
-                  strokeColor={Colors.Brand.brandColor}
-                />
-                <Marker
-                  title={
-                    this.props.activeDelivery.parcelLocationPhysicalAddress
-                  }
-                  coordinate={this.getActiveDeliveryPickUpLocation()}
-                  pinColor={Colors.Brand.brandColor}
-                />
-
-                <Marker
-                  title={
-                    this.props.activeDelivery.parcelDestinationPhysicalAddress
-                  }
-                  coordinate={this.getActiveDeliveryDestinationLocation()}
-                />
-
-                {this.props.activeDelivery && this.props.driver && (
-                  <Marker
-                    coordinate={{
-                      latitude: this.props.driver.lat,
-                      longitude: this.props.driver.lng,
-                    }}>
-                    <View style={styles.driverMarker}>
-                      <Icon
-                        name="drive-eta"
-                        type="MaterialIcons"
-                        style={styles.driverMarkerIcon}
-                      />
-                    </View>
-                  </Marker>
-                )}
-              </>
-            )}
-            {!this.props.activeDelivery && (
-              <Marker
-                coordinate={{
-                  latitude: this.props.watchPosition.latitude,
-                  longitude: this.props.watchPosition.longitude,
-                }}>
-                <Image
-                  resizeMode="contain"
-                  style={styles.imgUserLocation}
-                  source={require('../../../assets/media/images/marker.png')}
-                />
-              </Marker>
-            )}
-          </MapView>
-          <View style={styles.suggestion}>
-            <View style={styles.enlargeIndicator} />
-
-            {this.props.activeDelivery && (
-              <View>
-                {!this.props.deliveryDeleted && (
-                  <ListItem>
-                    <Left style={styles.left}>
-                      <Avatar
-                        containerStyle={styles.avatar}
-                        source={{
-                          uri: this.props.driver ? this.props.driver.photo : '',
-                        }}
-                      />
-                    </Left>
-                    <Body>
-                      <H3 style={styles.driverNameStyle}>
-                        {`${
-                          this.props.driver
-                            ? this.props.driver.firstName +
-                              ' ' +
-                              this.props.driver.lastName
-                            : ''
-                        }`}
-                      </H3>
-                      {this.props.activeDelivery.parcelStatus ===
-                        ParcelStatus.NOT_PICKED && (
-                        <View>
-                          <Text style={styles.parcelPicked}>
-                            Parcel Not picked
-                          </Text>
-                        </View>
-                      )}
-
-                      {this.props.activeDelivery.parcelStatus ===
-                        ParcelStatus.IN_PROGRESS && (
-                        <View>
-                          <Text style={styles.inProgressText}>
-                            Delivery in progress
-                          </Text>
-                        </View>
-                      )}
-
-                      {this.props.activeDelivery.parcelStatus ===
-                        ParcelStatus.PICKUP_DELIVERED && (
-                        <View>
-                          <Text style={styles.deliveredParcel}>
-                            Parcel Delivered
-                          </Text>
-                        </View>
-                      )}
-                    </Body>
-                    {this.props.activeDelivery.parcelStatus ===
-                      ParcelStatus.NOT_PICKED && (
-                      <Icon
-                        name="drive-eta"
-                        type="MaterialIcons"
-                        style={styles.icoDanger}
-                      />
-                    )}
-
-                    {this.props.activeDelivery.parcelStatus ===
-                      ParcelStatus.IN_PROGRESS && (
-                      <Icon
-                        name="drive-eta"
-                        type="MaterialIcons"
-                        style={styles.icoWarning}
-                      />
-                    )}
-
-                    {this.props.activeDelivery.parcelStatus ===
-                      ParcelStatus.PICKUP_DELIVERED && (
-                      <Icon
-                        name="drive-eta"
-                        type="MaterialIcons"
-                        style={styles.icoSuccess}
-                      />
-                    )}
-                  </ListItem>
-                )}
-
-                <ListItem>
-                  <Left style={styles.left}>
-                    <Icon
-                      type="FontAwesome5"
-                      name="map-pin"
-                      style={{color: Colors.Brand.brandColor}}
-                    />
-                  </Left>
-                  <Body>
-                    <Text style={styles.label}>Pick-Up Location</Text>
-                    <Text style={styles.locationString}>
-                      {this.props.activeDelivery.parcelLocationPhysicalAddress}
-                    </Text>
-                  </Body>
-                </ListItem>
-                <ListItem last noBorder>
-                  <Left style={styles.left}>
-                    <Icon name="pin" type="Entypo" style={styles.icoDanger} />
-                  </Left>
-                  <Body>
-                    <Text style={styles.label}>Destination</Text>
-                    <Text style={styles.locationString}>
-                      {
-                        this.props.activeDelivery
-                          .parcelDestinationPhysicalAddress
-                      }
-                    </Text>
-                  </Body>
-                </ListItem>
-
-                {this.props.deliveryDeleted && (
-                  <Text
-                    style={{
-                      marginLeft: 20,
-                      fontSize: 15,
-                      fontWeight: '600',
-                      color: 'red',
-                      marginBottom: 2,
-                      marginRight: 20,
-                    }}>
-                    Delivery have been cancelled. you can cancel or assign to
-                    another driver.{' '}
-                  </Text>
-                )}
-                {this.props.deliveryDeleted && (
-                  <View style={{flexDirection: 'row', marginHorizontal: 20}}>
-                    <View style={{flex: 1, marginRight: 2}}>
-                      <Button
-                        onPress={() => this.handleDialogCancelDelivery()}
-                        style={{borderRadius: 10}}
-                        danger
-                        block>
-                        <Text uppercase={false}>Discard</Text>
-                      </Button>
-                    </View>
-                    <View style={{flex: 1}}>
-                      <Button
-                        onPress={() => this.searchPickUp()}
-                        style={{
-                          backgroundColor: Colors.Brand.brandColor,
-                          borderRadius: 10,
-                        }}
-                        block>
-                        <Text uppercase={false}>Assign</Text>
-                      </Button>
-                    </View>
-                  </View>
-                )}
-                {this.props.activeDelivery.parcelStatus ===
-                  ParcelStatus.NOT_PICKED &&
-                  !this.props.deliveryDeleted && (
-                    <Fab
-                      active={true}
-                      style={styles.fabCancelDelivery}
-                      position="bottomRight"
-                      onPress={() =>
-                        this.cancelDelivery(this.props.activeDelivery.id)
-                      }>
-                      <Icon style={styles.icoWhite} name="close" />
-                    </Fab>
-                  )}
-
-                {this.props.activeDelivery.parcelStatus ===
-                  ParcelStatus.PICKUP_DELIVERED && (
-                  <Fab
-                    active={true}
-                    style={styles.fabSuccessDelivery}
-                    position="bottomRight"
-                    onPress={() =>
-                      this.confirmDelivery(this.props.activeDelivery.id)
-                    }>
-                    <Icon style={styles.icoWhite} name="checkmark" />
-                  </Fab>
-                )}
-              </View>
-            )}
-
-            {!this.props.activeDelivery && (
-              <>
-                <Text style={styles.welcomeText} note>
-                  welome nice to see you !
-                </Text>
-                <H3 style={styles.descLocation}>Want to pick parcel ?</H3>
-
-                <Item
-                  onPress={() =>
-                    this.navigate(NavigationScreens.CREATE_PARCEL_SCREEN)
-                  }
-                  bordered={false}
-                  style={styles.inputSearchLocation}>
-                  <Icon style={styles.searchIcon} active name="search" />
-                  <Input
-                    placeholderTextColor="#aaa"
-                    disabled
-                    placeholder="Search Pick up location"
-                  />
-                </Item>
-              </>
-            )}
-
-            {this.props.currentLocationStatus !== 'failed' &&
-              !this.props.activeDelivery && (
-                <Text style={styles.pickUpLocationCaption}>
-                  select a pick-up location
-                </Text>
-              )}
-
-            {this.props.currentLocationStatus === 'started' &&
-              !this.props.activeDelivery && (
-                <View style={styles.spinKitContainer}>
-                  <SpinKit
-                    color={Colors.Brand.brandColor}
-                    type="Circle"
-                    size={40}
-                  />
-                  <Text style={styles.searchingTextStyle} note>
-                    Searching my location ...
-                  </Text>
-                </View>
-              )}
-
-            {this.props.currentLocationStatus ===
-              currentLocation.GET_CUURENT_LOCATION_SUCCESS &&
-              !this.props.activeDelivery && (
-                <FlatList
-                  data={this.props.currentLocationPrediction}
-                  style={styles.flatList}
-                  renderItem={({item}) => (
-                    <ListItem onPress={() => this.setLocation(item)}>
-                      <Icon
-                        type="EvilIcons"
-                        style={styles.ico}
-                        name="location"
-                      />
-                      <Body>
-                        <Text>{item.address}</Text>
-                      </Body>
-                    </ListItem>
-                  )}
-                />
-              )}
-
-            {this.props.currentLocationStatus === 'failed' &&
-              !this.props.activeDelivery && (
-                <Button rounded block style={styles.retryBtn}>
-                  <Text style={styles.retryText}>
-                    Could not get location Retry ?{' '}
-                  </Text>
-                </Button>
-              )}
-          </View>
-
-          <Fab
-            active={true}
-            style={styles.fab}
-            position="topLeft"
-            onPress={() => toggleSideMenu(true, this.props.componentId)}>
-            <Icon style={{color: Colors.Brand.brandColor}} name="menu" />
-          </Fab>
+            <NativeBaseText uppercase={false}>Search</NativeBaseText>
+            <Icon name="search" />
+          </Button>
         </View>
+        <View style={{marginTop: 15}} />
+
+        <FlatList
+          extraData={new Date().getTime()}
+          ListEmptyComponent={
+            <View
+              style={{
+                marginTop: 20,
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}>
+              <Text style={{fontWeight: 'bold', marginTop: 150}}>
+                OOps there are no items !!
+              </Text>
+            </View>
+          }
+          ListFooterComponent={
+            isLoading && this.props.feeds.length > 10 ? (
+              <View
+                style={{
+                  justifyContent: 'center',
+                  alignContent: 'center',
+                  alignItems: 'center',
+                  marginVertical: 10,
+                }}>
+                <SpinKit type="Circle" />
+              </View>
+            ) : null
+          }
+          refreshControl={
+            <RefreshControl
+              onRefresh={() =>
+                this.props.getFeeds({pageSize: 10, pageNumber: 1}, true)
+              }
+              refreshing={isLoading}
+            />
+          }
+          data={this.props.feeds}
+          onEndReached={() => {
+            if (this.props.hasNextPage && !isLoading) {
+              this.props.getFeeds(
+                {pageSize: 10, pageNumber: this.props.page},
+                false,
+              );
+            }
+          }}
+          onEndReachedThreshold={0.5}
+          renderItem={({item, index}) => (
+            <Card
+              key={index}
+              style={{marginBottom: 15, marginHorizontal: 5}}
+              onPress={() => console.log('press on a card')}>
+              <Card.Section
+                imageSource={{uri: item.coverImage}}
+                imageStyle={{height: 270}}
+              />
+
+              <View padding-15 bg-white>
+                <Text text60 color={Colors.grey10}>
+                  {item.title}
+                </Text>
+
+                <Text
+                  marginT
+                  numberOfLines={3}
+                  ellipsizeMode="tail"
+                  text80
+                  color={Colors.grey10}>
+                  {item.description}
+                </Text>
+              </View>
+              <View
+                row
+                style={{
+                  marginBottom: 10,
+                  marginHorizontal: 20,
+                  alignItems: 'center',
+                }}>
+                <Text
+                  style={{fontWeight: 'bold', marginRight: 10, fontSize: 25}}>
+                  ₦{formatAmountWithComma(item.price)}
+                </Text>
+                <View style={{flexDirection: 'row'}}>
+                  <Button
+                    rounded
+                    onPress={() => this.props.addToCart(item, true)}
+                    style={{paddingVertical: 15, paddingHorizontal: 8}}
+                    small
+                    success
+                    iconLeft
+                    bordered>
+                    <Icon type="Feather" name="shopping-cart" />
+                    <Text style={{fontSize: 20, marginLeft: 10}}>+</Text>
+                  </Button>
+                  <Button
+                    onPress={() => this.props.addToCart(item, false)}
+                    rounded
+                    style={{
+                      paddingVertical: 15,
+                      paddingHorizontal: 8,
+                      marginLeft: 10,
+                    }}
+                    small
+                    success
+                    iconLeft
+                    bordered>
+                    <Icon type="Feather" name="shopping-cart" />
+                    <Text style={{fontSize: 20, marginLeft: 10}}>-</Text>
+                  </Button>
+                  <View
+                    style={{
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      height: 30,
+                      width: 30,
+                      marginLeft: 10,
+                      borderColor: 'lightgray',
+                      borderWidth: 1,
+                      borderRadius: 100,
+                    }}>
+                    <Text style={{fontWeight: 'bold'}}>
+                      {this.getItemCount(item.postId)}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </Card>
+          )}
+        />
+
+        <Fab
+          active={true}
+          style={styles.fab}
+          position="topLeft"
+          onPress={() => toggleSideMenu(true, this.props.componentId)}>
+          <Icon style={{color: Brand.Brand.brandColor}} name="menu" />
+        </Fab>
+        <Fab
+          active={true}
+          style={styles.fab}
+          style={{backgroundColor: Brand.Brand.brandColor}}
+          position="bottomRight"
+          onPress={() =>
+            Navigation.push(this.props.componentId, {
+              component: {
+                id: NavigationScreens.CREATE_PARCEL_SCREEN,
+                name: NavigationScreens.CREATE_PARCEL_SCREEN,
+              },
+            })
+          }>
+          <Icon style={{color: '#fff'}} name="md-add-outline" />
+        </Fab>
       </Container>
     );
   }

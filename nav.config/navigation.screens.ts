@@ -6,6 +6,8 @@ enum NavigationScreens {
   NOTIFICATION_SCREEN = 'stack.user.notifications',
   CREATE_PARCEL_SCREEN = 'stack.user.createParcel',
   PARCEL_DELIVERY_CALCULATION_SCREEN = 'stack.user.calculate.cost',
+  PARCEL_DELIVERY_CUSTOMERS_ORDERS_SCREEN = 'stack.user.customers.orders',
+  PARCEL_DELIVERY_MY_ORDERS_SCREEN = 'stack.user.my.orders',
   PAYMENT_OPTION_SCREEN = 'stack.user.payment.options',
   CREDIT_CARD = 'stack.user.credit.card',
   USER_PROFILE = 'stack.user.profile',

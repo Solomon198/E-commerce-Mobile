@@ -1,5 +1,5 @@
 import React from 'react';
-import {StyleSheet, FlatList} from 'react-native';
+import {StyleSheet, FlatList, Alert} from 'react-native';
 import {
   Container,
   Input,
@@ -27,11 +27,12 @@ import NavigationScreens from '../../../nav.config/navigation.screens';
 import User from '../types/user';
 import {Driver} from '../types/driver';
 import {Avatar} from 'react-native-ui-lib';
+import firestore from '@react-native-firebase/firestore';
 import _ from 'lodash';
 import {ScrollView} from 'react-native';
 import {Colors, View, Card, Text} from 'react-native-ui-lib';
 // @ts-ignore
-import posts from '../user/_mock_data_/posts';
+import posts from './_mock_data_/posts';
 import {
   formatAmountWithComma,
   getDefaultProfilePicture,
@@ -245,13 +246,41 @@ type CardsScreenState = {
   selected2: boolean;
 };
 
-class UsersPost extends React.Component<Props> {
+class MyOrders extends React.Component<Props> {
+  watchChanges: any;
   componentDidMount() {
-    this.props.getUserPost(this.props.user.userId);
+    this.watchChanges = firestore()
+      .collection('Orders')
+      .where('customerId', '==', this.props.user.userId)
+      .onSnapshot((snapshot) => {
+        if (!snapshot.empty) {
+          const docArray: any[] = [];
+          snapshot.forEach((doc) => {
+            let data = doc.data();
+            data['docId'] = doc.id;
+            console.log(data);
+            docArray.push(data);
+          });
+          this.setState({orders: docArray});
+        } else {
+          this.setState({orders: []});
+        }
+      });
   }
+
+  componentWillUnmount() {
+    try {
+      if (this.watchChanges) {
+        this.watchChanges();
+      }
+    } catch {}
+  }
+
+  state = {
+    isLoading: false,
+    orders: [],
+  };
   render() {
-    const isLoading =
-      this.props.userPostStatus === GetUserPosts.GET_USER_POSTS_STARTED;
     return (
       <Container style={styles.mainContainer}>
         <View style={{flexDirection: 'row', padding: 10}}>
@@ -268,12 +297,12 @@ class UsersPost extends React.Component<Props> {
           </View>
           <View style={{justifyContent: 'center', marginHorizontal: 10}}>
             <Text style={{fontWeight: 'bold', fontSize: 18, color: '#555'}}>
-              My Items for sale
+              My orders
             </Text>
           </View>
         </View>
         <View style={{marginTop: 5}} />
-        {isLoading ? (
+        {this.state.isLoading ? (
           <View
             style={{
               justifyContent: 'center',
@@ -287,7 +316,7 @@ class UsersPost extends React.Component<Props> {
 
         <FlatList
           ListEmptyComponent={() =>
-            !isLoading ? (
+            !this.state.isLoading ? (
               <View>
                 <Text
                   style={{
@@ -295,13 +324,16 @@ class UsersPost extends React.Component<Props> {
                     alignSelf: 'center',
                     marginTop: 200,
                     fontSize: 18,
+                    textAlign: 'center',
+                    marginHorizontal: 20,
                   }}>
-                  You have not made any post.
+                  You have not ordered anything yet.make an order and see it
+                  here.
                 </Text>
               </View>
             ) : null
           }
-          data={this.props.userPosts}
+          data={this.state.orders}
           renderItem={({item, index}) => (
             <Card
               key={index}
@@ -337,56 +369,59 @@ class UsersPost extends React.Component<Props> {
                   style={{fontWeight: 'bold', marginRight: 10, fontSize: 25}}>
                   ₦{formatAmountWithComma(item.price)}
                 </Text>
-                <Button
-                  onPress={() =>
-                    Navigation.push(this.props.componentId, {
-                      component: {
-                        id: NavigationScreens.CREATE_PARCEL_SCREEN,
-                        name: NavigationScreens.CREATE_PARCEL_SCREEN,
-                        passProps: {
-                          postToEdit: item,
-                        },
-                      },
-                    })
-                  }
-                  rounded
+                <View
                   style={{
-                    paddingVertical: 15,
-                    paddingHorizontal: 8,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    height: 30,
+                    width: 30,
                     marginLeft: 10,
-                  }}
+                    borderColor: 'lightgray',
+                    borderWidth: 1,
+                    borderRadius: 100,
+                    marginRight: 10,
+                  }}>
+                  <Text style={{fontWeight: 'bold', color: 'dark'}}>
+                    {item.count}
+                  </Text>
+                </View>
+                <Button
+                  rounded
+                  onPress={() =>
+                    Alert.alert(
+                      'Delivery confirmation',
+                      'by pressing Yes you agree that the item in question have been delivered to you and hence payment will be released to the vendor',
+                      [
+                        {
+                          onPress: () =>
+                            firestore()
+                              .collection('Orders')
+                              .doc(item.docId)
+                              .delete()
+                              .then((doc) => {
+                                console.log(doc);
+                                console.log(item);
+                                Alert.alert('Delivery confirmed successfully');
+                              }),
+                          text: 'Yes',
+                        },
+                        {onPress: () => '', text: 'No'},
+                      ],
+                    )
+                  }
+                  style={{paddingVertical: 15, paddingHorizontal: 8}}
                   success
-                  iconLeft
-                  bordered>
-                  <Icon type="Entypo" name="edit" />
-                  <Text style={{marginLeft: 10}}>Edit</Text>
+                  iconLeft>
+                  <Icon type="Feather" name="check" />
+                  <Text style={{color: 'white'}}>Confirm Delivery</Text>
                 </Button>
               </View>
             </Card>
           )}
         />
-
-        <Fab
-          active={true}
-          style={styles.fab}
-          style={{backgroundColor: Brand.Brand.brandColor}}
-          position="bottomRight"
-          onPress={() =>
-            Navigation.push(this.props.componentId, {
-              component: {
-                id: NavigationScreens.CREATE_PARCEL_SCREEN,
-                name: NavigationScreens.CREATE_PARCEL_SCREEN,
-                passProps: {
-                  fromList: true,
-                },
-              },
-            })
-          }>
-          <Icon style={{color: '#fff'}} name="md-add-outline" />
-        </Fab>
       </Container>
     );
   }
 }
 
-export default connect(mapStateToProps, mapDispatchStateToProps)(UsersPost);
+export default connect(mapStateToProps, mapDispatchStateToProps)(MyOrders);

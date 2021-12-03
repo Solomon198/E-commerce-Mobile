@@ -30,6 +30,13 @@ export default function* rootSaga() {
     UserSaga.watchSetProfilePics(),
     UserSaga.watchSetLocationDetails(),
 
+    UserSaga.watchGetCategories(),
+    UserSaga.watchPostNewItem(),
+    UserSaga.watchGetFeeds(),
+    UserSaga.watchGetUserFeeds(),
+    UserSaga.watchAddToCart(),
+    UserSaga.watchPaymentSuccess(),
+
     //lang
 
     LangSaga.ChangeLanguage(),

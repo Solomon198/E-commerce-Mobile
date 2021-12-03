@@ -12,6 +12,12 @@ import {
   RemoveCreditCard,
   GetCreditCards,
   GetUsersParcel,
+  GetCategories,
+  Post,
+  GetFeeds,
+  GetUserPosts,
+  AddCart,
+  PaymentSuccess,
 } from '../../configs/global.enum';
 import {appUrl} from '../../configs/globals.config';
 import axios from 'axios';
@@ -22,6 +28,170 @@ import RNPaystack from 'react-native-paystack';
 import Utils from '../utilities/index';
 import {NodeEnv} from 'react-native-dotenv';
 import crashlytics from '@react-native-firebase/crashlytics';
+
+function errorExtractor(e) {
+  if (e.response) {
+    return e.response.data.message;
+  } else {
+    return e.message;
+  }
+}
+
+// CAMPUS SHOPING
+//=======================================================================
+// GETING CATEGORIES
+// ======================================================
+const getCategories = async () => {
+  try {
+    return axios.get(`${appUrl}/categories`);
+  } catch (e) {
+    return e;
+  }
+};
+
+function* watchPaymentSuccess() {
+  yield takeEvery(PaymentSuccess.PAYMENT_CALLER, function* (action: any) {
+    yield put({type: PaymentSuccess.PAYMENT_SUCCESS});
+  });
+}
+
+function* watchAddToCart() {
+  yield takeLeading(AddCart.ADD_TO_CART_CALLER, function* (action: any) {
+    yield put({
+      type: AddCart.ADD_TO_CART,
+      payload: action.payload,
+      isAdding: action.isAdding,
+    });
+  });
+}
+
+function* watchGetCategories() {
+  yield takeEvery(GetCategories.GET_CATEGORIES_CALLER, function* (action: any) {
+    try {
+      yield put({type: GetCategories.GET_CATEGORIES_STARTED});
+      // @ts-ignore
+      const $getCategories: any = yield call(
+        getCategories.bind(null, action.payload),
+      );
+      yield put({
+        type: GetCategories.GET_CATEGORIES_SUCCESS,
+        payload: $getCategories.data.payload,
+      });
+    } catch (e) {
+      yield put({
+        type: GetCategories.GET_CATEGORIES_FAILED,
+        payload: errorExtractor(e),
+      });
+    }
+  });
+}
+
+// ======================================================================
+// ==================================================================
+// POST NEW ITEM
+//=======================================================================
+
+const post = async (payload: any) => {
+  try {
+    return axios.post(`${appUrl}/posts`, payload);
+  } catch (e) {
+    return e;
+  }
+};
+function* watchPostNewItem() {
+  yield takeEvery(Post.POST_CALLER, function* (action: any) {
+    try {
+      yield put({type: Post.POST_STARTED});
+      // @ts-ignore
+      const $postNewItem: any = yield call(post.bind(null, action.payload));
+      yield put({
+        type: Post.POST_SUCCESS,
+        payload: $postNewItem.data.payload,
+        isUpdate: action.isUpdate,
+      });
+      Navigation.popToRoot(NavigationScreens.CREATE_PARCEL_SCREEN);
+    } catch (e) {
+      console.log(e);
+      console.log(errorExtractor(e));
+      yield put({type: Post.POST_FAILED, payload: errorExtractor(e)});
+    }
+  });
+}
+
+// ======================================================================
+// ==================================================================
+// POST NEW ITEM
+//=======================================================================
+
+const getFeeds = async (queryParam: any) => {
+  try {
+    return axios.get(`${appUrl}/posts/feeds`, {params: queryParam});
+  } catch (e) {
+    return e;
+  }
+};
+function* watchGetFeeds() {
+  yield takeLeading(GetFeeds.GET_FEEDS_CALLER, function* (action: any) {
+    try {
+      yield put({type: GetFeeds.GET_FEEDS_STARTED});
+      // @ts-ignore
+      const $fetchFeeds: any = yield call(
+        getFeeds.bind(null, action.queryParams),
+      );
+      const resultLen = $fetchFeeds.data.payload.posts.length;
+      console.log('-----------------------------------------------');
+      console.log(resultLen);
+      yield put({
+        type: GetFeeds.GET_FEEDS_SUCCESS,
+        payload: $fetchFeeds.data.payload.posts,
+        queryParams: action.queryParams,
+        isRefresh: action.isRefresh ? true : false,
+        hasNextPage: resultLen < 1 || resultLen < 10 ? false : true,
+      });
+    } catch (e) {
+      console.log(errorExtractor(e));
+      yield put({type: GetFeeds.GET_FEEDS_FAILED, payload: errorExtractor(e)});
+    }
+  });
+}
+
+// ======================================================================
+// ==================================================================
+// POST NEW ITEM
+//=======================================================================
+
+const getUserPosts = async (queryParam: any) => {
+  try {
+    return axios.get(`${appUrl}/posts`, {params: queryParam});
+  } catch (e) {
+    console.log(e);
+    return e;
+  }
+};
+function* watchGetUserFeeds() {
+  yield takeEvery(GetUserPosts.GET_USER_POSTS_CALLER, function* (action: any) {
+    try {
+      yield put({type: GetUserPosts.GET_USER_POSTS_STARTED});
+      // @ts-ignore
+      const $getUserPosts: any = yield call(
+        getUserPosts.bind(null, {userId: action.payload}),
+      );
+      yield put({
+        type: GetUserPosts.GET_USER_POSTS_SUCCESS,
+        payload: $getUserPosts.data.payload,
+      });
+    } catch (e) {
+      console.log(e);
+      yield put({
+        type: GetUserPosts.GET_USER_POSTS_FAILED,
+        payload: errorExtractor(e),
+      });
+    }
+  });
+}
+
+// =============================================================================
+// =======================================================================================
 
 function* watchSetParcelLocation() {
   yield takeEvery(
@@ -614,6 +784,13 @@ function* watchGetUserParcels() {
 }
 
 export default {
+  watchGetCategories,
+  watchPostNewItem,
+  watchGetFeeds,
+  watchGetUserFeeds,
+  watchAddToCart,
+  watchPaymentSuccess,
+
   watchGetCreditCards,
   setCardEmail,
   watchSetLocationDetails,

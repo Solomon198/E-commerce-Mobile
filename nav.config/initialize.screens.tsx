@@ -12,6 +12,8 @@ import NewPassword from '../src/app/auth/new.password';
 
 //user navigations
 import UserSideMenu from '../src/app/user/side.menu';
+import CustomersOrders from '../src/app/user/customers.orders';
+import MyOrders from '../src/app/user/my.orders';
 import UserParcelManager from '../src/app/user/status.parcels';
 import UserDashboard from '../src/app/user/main.dashboard';
 import UserNotifications from '../src/app/user/manager.notifications';
@@ -42,6 +44,16 @@ export default function InitializeScreens() {
   Navigation.registerComponent(
     NavigationScreens.SWITCH_SCREEN,
     () => Wrapper(App) as any,
+  );
+
+  Navigation.registerComponent(
+    NavigationScreens.PARCEL_DELIVERY_CUSTOMERS_ORDERS_SCREEN,
+    () => Wrapper(CustomersOrders) as any,
+  );
+
+  Navigation.registerComponent(
+    NavigationScreens.PARCEL_DELIVERY_MY_ORDERS_SCREEN,
+    () => Wrapper(MyOrders) as any,
   );
 
   //UserPages

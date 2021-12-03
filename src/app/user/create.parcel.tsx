@@ -1,31 +1,39 @@
 import React from 'react';
+import _ from 'lodash';
 import {
   View,
   StyleSheet,
   TouchableOpacity,
   TextInput,
   Keyboard,
-  FlatList,
-  Image,
   Modal,
-  TouchableNativeFeedback,
+  Alert,
+  Dimensions,
+  ImageBackground,
+  ScrollView,
 } from 'react-native';
-import {Icon, Spinner, Container, H3, Text, Button, Fab} from 'native-base';
+import {Icon, Text, Fab, H1, H2, Textarea} from 'native-base';
 import Colors from '../../configs/styles/index';
 import {Navigation} from 'react-native-navigation';
-import MapView, {PROVIDER_GOOGLE, Marker} from 'react-native-maps'; // remove PROVIDER_GOOGLE import if not using Google Maps
 import {connect} from 'react-redux';
 import SpinKit from 'react-native-spinkit';
-import FireStore from '@react-native-firebase/firestore';
 import {
+  GetCategories,
   inputActionType,
+  Post,
   searchLocation,
   setLocation,
 } from '../../configs/global.enum';
-import axios from 'axios';
-import NavigationScreens from '../../../nav.config/navigation.screens';
-import {API_KEY} from 'react-native-dotenv';
 import crashlytics from '@react-native-firebase/crashlytics';
+import {Picker} from 'react-native-ui-lib';
+import utilities from '../utilities';
+import User from '../types/user';
+import storage from '@react-native-firebase/storage';
+import brandColors from '../../configs/styles/brand.colors';
+import {formatAmountWithComma} from '../utilities/helper.funcs';
+
+const {width} = Dimensions.get('window');
+const firebaseStorage = storage;
 
 type searchResult = {
   primaryText: string;
@@ -43,6 +51,7 @@ type locationDetails = {
 type Props = {
   longitude: number;
   latitude: number;
+  user: User;
   componentId: string;
   locationSearchString: string;
   destinationSearchString: string;
@@ -52,6 +61,11 @@ type Props = {
   searchResults: searchResult[];
   pickUpLocation: locationDetails;
   pickUpDestination: locationDetails;
+  categories: any[];
+  feeds: any[];
+  postStatus: string;
+  isUpdate: boolean;
+  postToEdit: any;
 
   setDestinationSearchString: (str: string) => void;
   setLocationSearchString: (str: string) => void;
@@ -61,8 +75,9 @@ type Props = {
   setFetchedLocation: (payload: any) => void;
   ressetInputs: () => void;
   setVariables: (payload: any) => void;
+  getCategories: () => void;
+  post: (payload: any, isUpdate: boolean) => void;
 };
-
 const mapStateToProps = (store: any) => ({
   locationSearchString: store.User.locationSearchString,
   destinationSearchString: store.User.destinationSearchString,
@@ -72,6 +87,10 @@ const mapStateToProps = (store: any) => ({
   searchResults: store.User.searchResults,
   pickUpLocation: store.User.pickUpLocation,
   pickUpDestination: store.User.pickUpDestination,
+  user: store.Auth.user,
+  categories: store.User.categories,
+  feeds: store.User.posts,
+  postStatus: store.User.postStatus,
 });
 
 const mapDispatchStateToProps = (dispatch: any) => ({
@@ -96,131 +115,69 @@ const mapDispatchStateToProps = (dispatch: any) => ({
     dispatch({type: inputActionType.SET_VARIABLES_CALLER, payload}),
   setFetchedLocation: (payload: any) =>
     dispatch({type: inputActionType.SET_LOCATION_CALLER, payload: payload}),
+  getCategories: () => dispatch({type: GetCategories.GET_CATEGORIES_CALLER}),
+  post: (payload: any, isUpdate: boolean) =>
+    dispatch({type: Post.POST_CALLER, payload, isUpdate}),
 });
 
 const styles = StyleSheet.create({
-  confirmIco: {
-    fontSize: 18,
-    color: 'forestgreen',
-  },
-  header: {},
-  ico: {
-    fontSize: 20,
-    color: '#888',
-  },
-  input: {
-    backgroundColor: '#f4f4f4',
-    width: '100%',
-    borderRadius: 10,
-  },
-  label: {
-    fontWeight: 'bold',
-    color: '#555',
-    marginBottom: 20,
-  },
-  inputContainer: {
-    flex: 1,
-  },
-  icoContainer: {
-    justifyContent: 'center',
-    alignContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-  },
-  container: {
+  postHeader: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    alignContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    maxHeight: 100,
-    marginBottom: 10,
+  },
+  pageClose: {
+    width: 50,
+    height: 50,
+    backgroundColor: 'whitesmoke',
+    borderRadius: 100,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   mainContainer: {
     flex: 1,
-    backgroundColor: '#fff',
-    paddingVertical: 15,
+    paddingHorizontal: 10,
+    paddingTop: 10,
   },
-  locationSearchedString: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: '#555',
+  input: {
+    backgroundColor: '#fff',
+    borderRadius: 5,
+    borderColor: '#e8e8e8',
+    borderWidth: 1,
+    marginVertical: 10,
+    paddingHorizontal: 10,
+  },
+  accountActions: {
+    backgroundColor: '#f4f4f4',
+    width: 60,
+    height: 60,
+    borderRadius: 100,
+    borderWidth: 1,
+    borderColor: '#e8e8e8',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  uploadAction: {
+    fontFamily: 'sans-serif-light',
+    marginVertical: 50,
+    fontSize: 19,
+    fontWeight: 'bold',
+    color: Colors.Brand.brandColor,
   },
   modal: {
     flex: 1,
-    backgroundColor: '#fff',
-  },
-  subContainer: {flexDirection: 'row'},
-  closeIcon: {color: '#555'},
-  mainHeader: {
     justifyContent: 'center',
     alignContent: 'center',
     alignItems: 'center',
-  },
-  hint: {
-    fontSize: 12,
-    color: Colors.Brand.brandColor,
-    marginBottom: 10,
-  },
-  locationIcon: {width: 30, height: 30},
-  locationSelectorContainer: {
-    width: 40,
-    paddingLeft: 5,
-    alignContent: 'center',
-    alignItems: 'center',
-  },
-  spinnerContainer: {width: 40},
-  spinnerStyle: {height: 50},
-  fabBg: {backgroundColor: '#fff'},
-  map: {
-    flex: 1,
-  },
-  headerDrag: {},
-  modalHeader: {
-    backgroundColor: '#fff',
-  },
-  enlargeIndicator: {
-    width: 50,
-    height: 5,
-    backgroundColor: '#e8e8e8',
-    borderRadius: 50,
-    marginVertical: 8,
-    alignSelf: 'center',
-  },
-  suggestion: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 3},
-    shadowOpacity: 0.9,
-    shadowRadius: 10,
-    elevation: 15,
+    backgroundColor: 'rgba(255,255,255,0.7)',
     paddingHorizontal: 20,
-    paddingBottom: 20,
-    height: 150,
   },
-  listItemExtended: {
-    marginTop: 10,
+  uploaderContainer: {justifyContent: 'center', alignItems: 'center'},
+  progressPercentage: {
+    position: 'absolute',
+    fontWeight: 'bold',
+    color: Colors.Brand.brandColor,
   },
-  defaultTextLocation: {
-    marginLeft: 10,
-    color: Colors.Brand.danger,
-    fontSize: 13,
-  },
-  locationLoaderContainer: {
-    justifyContent: 'center',
-    alignContent: 'center',
-    alignItems: 'center',
-  },
-  locationLoaderText: {fontSize: 12},
-  locationResultContainer: {flexDirection: 'row', justifyContent: 'center'},
-  errorTextLocation: {
-    marginLeft: 10,
-    color: Colors.Brand.danger,
-    fontSize: 13,
-  },
-  successLocationCheckIcon: {color: '#fff'},
-  fabNext: {backgroundColor: '#fff'},
 });
 class CreateParcel extends React.Component<Props> {
   navigationEventListener: any;
@@ -237,6 +194,16 @@ class CreateParcel extends React.Component<Props> {
     showModal: false,
     address: '',
     gettingLocationStatus: 'NOT-STARTED',
+    language: '',
+    coverImage: '',
+    title: '',
+    description: '',
+    price: '',
+    category: {value: '', label: ''},
+    count: 0,
+    totalPercentage: 0,
+    uploading: false,
+    uploadState: 'Uploading Image ....',
   };
 
   goBack() {
@@ -244,362 +211,275 @@ class CreateParcel extends React.Component<Props> {
     Navigation.pop(this.props.componentId);
   }
 
-  calculateCost() {
-    Keyboard.dismiss();
-    if (
-      this.props.pickUpDestination.address &&
-      this.props.pickUpLocation.address
-    ) {
-      this.props.setLocationInputActive(true);
-      Navigation.push(this.props.componentId, {
-        component: {
-          name: NavigationScreens.PARCEL_DELIVERY_CALCULATION_SCREEN,
-          id: NavigationScreens.PARCEL_DELIVERY_CALCULATION_SCREEN,
+  post(media: string) {
+    this.setState({uploading: true});
+
+    const checkPicture = this.state.coverImage.indexOf('http');
+    if (this.props.postToEdit && checkPicture >= 0) {
+      return this.props.post(
+        {
+          title: this.state.title,
+          description: this.state.description,
+          coverImage: this.state.coverImage,
+          category: this.state.category.value,
+          price: this.state.price,
+          userId: this.props.user.userId,
+          postId: this.props.postToEdit.postId,
         },
-      });
+        this.props.postToEdit.postId ? true : false,
+      );
     }
+
+    const stamp = new Date().getTime();
+    let $task = firebaseStorage()
+      .ref('/profile/medias/user')
+      .child('Img' + stamp)
+      .putFile(media);
+
+    $task.on('state_changed', (task) => {
+      let percentageUploaded = (task.bytesTransferred / task.totalBytes) * 100;
+      this.setState({totalPercentage: percentageUploaded});
+    });
+
+    $task.then(() => {
+      $task.snapshot?.ref
+        .getDownloadURL()
+        .then((url) => {
+          this.setState({uploading: false});
+          const $post = {
+            title: this.state.title,
+            description: this.state.description,
+            coverImage: url,
+            category: this.state.category.value,
+            price: this.state.price.toString(),
+            userId: this.props.user.userId,
+          };
+          if (this.props.postToEdit) {
+            if (this.props.postToEdit.postId) {
+              $post['postId'] = this.props.postToEdit.postId;
+            }
+          }
+          this.props.post($post, this.props?.postToEdit?.postId ? true : false);
+        })
+        .catch((e) => {
+          console.log(e);
+          crashlytics().log('could not get download url for uploaded task');
+          crashlytics().recordError(e);
+        });
+    });
+
+    $task.catch((e) => {
+      crashlytics().log('uploading image failed');
+      crashlytics().recordError(e);
+      this.setState({uploading: false}, () => {
+        Alert.alert('', 'unable to upload profile photo');
+      });
+    });
   }
 
-  getVariables() {
-    const path = FireStore().collection('Variables').doc('app');
-    path
-      .get()
-      .then((data) => {
-        let variables = data.data();
-        this.props.setVariables(variables);
+  uploadProfilePic() {
+    utilities.Helpers.getImageFromGallery()
+      .then((url) => {
+        this.setState({coverImage: url});
+        // this.setState(
+        //   {uploading: true, uploadState: 'Uploading Profile Picture ....'},
+        //   () => {
+        //     this.upload(url as string);
+        //   },
+        // );
       })
       .catch((e) => {
-        crashlytics().log('error getting environment config');
+        crashlytics().log('uploading error');
         crashlytics().recordError(e);
+        Alert.alert('', 'unable to upload profile photo');
       });
   }
 
   componentDidMount() {
-    this.getVariables();
-    let defaultSearchStr = this.props.pickUpLocation.address || 'se';
-    this.props.searchLocation(defaultSearchStr);
-    this.locationRef.focus();
-  }
+    this.props.getCategories();
 
-  setPickUpLocation(text: string) {
-    this.props.setLocationSearchString(text);
-
-    if (this.pickUplocationTimerHandler) {
-      clearTimeout(this.pickUplocationTimerHandler);
-    }
-    this.pickUplocationTimerHandler = setTimeout(() => {
-      this.props.searchLocation(text);
-      clearTimeout(this.pickUplocationTimerHandler);
-    }, 700);
-  }
-
-  setDestinationLocation(text: string) {
-    this.props.setDestinationSearchString(text);
-
-    if (this.destinationTimerHandler) {
-      clearTimeout(this.destinationTimerHandler);
-    }
-    this.destinationTimerHandler = setTimeout(() => {
-      this.props.searchLocation(text);
-      clearTimeout(this.destinationTimerHandler);
-    }, 700);
-  }
-
-  componentWillUnmount() {
-    this.props.setLocationInputActive(true);
-    this.props.ressetInputs();
-  }
-
-  getAddress(longitude: number, latitude: number) {
-    this.setState({gettingLocationStatus: 'started'});
-    //function to get address using current lat and lng
-    axios
-      .get(
-        'https://maps.googleapis.com/maps/api/geocode/json?address=' +
-          latitude +
-          ',' +
-          longitude +
-          '&key=' +
-          API_KEY,
-      )
-      .then((responseJson) => {
-        let address = responseJson.data.results[0].formatted_address;
-        this.setState({
-          gettingLocationStatus: 'success',
-          longitude,
-          latitude,
-          address,
-        });
-      })
-      .catch((e) => {
-        crashlytics().log('could not get physical address from googleapis.com');
-        crashlytics().recordError(e);
-        this.setState({gettingLocationStatus: 'failed'});
+    if (this.props.postToEdit) {
+      const {
+        coverImage,
+        title,
+        description,
+        price,
+        category,
+      } = this.props.postToEdit;
+      const {name} = this.props.categories.find(
+        ($category) => $category.categoryId === category,
+      );
+      this.setState({
+        coverImage,
+        title,
+        description,
+        price: price.toString(),
+        category: {label: name, value: category},
       });
+    }
   }
 
-  renderMap() {
+  renderUploader() {
     return (
       <Modal
-        visible={this.state.showModal}
-        onRequestClose={() => this.setState({showModal: false})}>
-        <MapView
-          provider={PROVIDER_GOOGLE} // remove if not using Google Maps
-          style={styles.map}
-          region={{
-            latitude: this.state.latitude,
-            longitude: this.state.longitude,
-            latitudeDelta: 0.015,
-            longitudeDelta: 0.0121,
-          }}>
-          <Marker
-            coordinate={{
-              longitude: this.state.longitude,
-              latitude: this.state.latitude,
-            }}
-            pinColor={Colors.Brand.danger}
-            draggable={true}
-            onDragEnd={({
-              nativeEvent: {
-                coordinate: {longitude, latitude},
-              },
-            }) => this.getAddress(longitude, latitude)}
-          />
-        </MapView>
-        <View style={styles.suggestion}>
-          <View style={styles.enlargeIndicator} />
-          <H3 style={styles.label}>
-            {this.props.locationInputActive
-              ? ' Pick-up location'
-              : ' Destination location'}
-          </H3>
-
-          {this.state.gettingLocationStatus === 'NOT-STARTED' && (
-            <View>
-              <Text style={styles.defaultTextLocation}>
-                You have not selected a location, drag and drop pin to select a
-                location.
-              </Text>
-            </View>
-          )}
-
-          {this.state.gettingLocationStatus === 'started' && (
-            <View style={styles.locationLoaderContainer}>
-              <SpinKit
-                type="Circle"
-                color={Colors.Brand.brandColor}
-                size={30}
-              />
-              <Text style={styles.locationLoaderText}>
-                Getting location info...
-              </Text>
-            </View>
-          )}
-          {this.state.gettingLocationStatus === 'success' && (
-            <View style={styles.locationResultContainer}>
-              <View style={styles.icoContainer}>
-                <Icon type="EvilIcons" style={styles.ico} name="location" />
-              </View>
-              <View style={styles.inputContainer}>
-                <Text style={styles.locationSearchedString}>
-                  {this.state.address}
-                </Text>
-              </View>
-            </View>
-          )}
-
-          {this.state.gettingLocationStatus === 'failed' && (
-            <View>
-              <Text style={styles.errorTextLocation}>
-                Could not get location info please try again
-              </Text>
-            </View>
-          )}
-
-          {this.state.gettingLocationStatus === 'success' && (
-            <Fab
-              active={true}
-              style={{backgroundColor: Colors.Brand.success}}
-              position="bottomRight"
-              onPress={() =>
-                this.setState({showModal: false}, () => {
-                  this.props.setFetchedLocation({
-                    location: {
-                      longitude: this.state.longitude,
-                      latitude: this.state.latitude,
-                    },
-                    address: this.state.address,
-                  });
-                })
-              }>
-              <Icon style={styles.successLocationCheckIcon} name="checkmark" />
-            </Fab>
-          )}
+        transparent
+        visible={
+          this.state.uploading || this.props.postStatus === Post.POST_STARTED
+        }>
+        <View style={styles.modal}>
+          <View style={styles.uploaderContainer}>
+            <SpinKit size={200} type="Circle" color={Colors.Brand.brandColor} />
+            <H2 style={styles.progressPercentage}>
+              {this.state.totalPercentage.toFixed(0) + '%'}
+            </H2>
+          </View>
+          <H1 style={styles.uploadAction}>{this.state.uploadState} </H1>
         </View>
-
-        <Fab
-          active={true}
-          style={styles.fabNext}
-          position="topLeft"
-          onPress={() => this.setState({showModal: false})}>
-          <Icon style={{color: Colors.Brand.brandColor}} name="close" />
-        </Fab>
       </Modal>
     );
   }
 
   render() {
+    const formatCategories = this.props.categories.map((category) => ({
+      label: category.name,
+      value: category.categoryId,
+    }));
+
     return (
-      <Container style={styles.mainContainer}>
-        {this.renderMap()}
-        <View style={styles.subContainer}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        style={{backgroundColor: '#fff', padding: 10}}>
+        {this.renderUploader()}
+        <View style={styles.postHeader}>
           <View>
-            <Button onPress={() => this.goBack()} transparent small icon>
-              <Icon style={styles.closeIcon} name="close" />
-            </Button>
+            <Text style={{fontSize: 20, fontWeight: 'bold', color: '#777'}}>
+              {this.props.postToEdit
+                ? 'Editing post'
+                : 'What do you want to sell ?'}
+            </Text>
           </View>
-          <View style={styles.mainHeader}>
-            <H3 style={styles.label}>
-              {this.props.locationInputActive
-                ? 'Enter pick up location'
-                : 'Enter destination'}
-            </H3>
-            <Text style={styles.hint}>
-              click on the map icon to choose location on map
+          <TouchableOpacity
+            onPress={() => Navigation.pop(this.props.componentId)}
+            style={styles.pageClose}>
+            <Icon
+              style={{color: '#444', fontSize: 20}}
+              name="close"
+              type="AntDesign"
+            />
+          </TouchableOpacity>
+        </View>
+        {this.state.coverImage ? (
+          <ImageBackground
+            source={{uri: this.state.coverImage}}
+            style={{width: null, height: 250}}
+            resizeMode="cover"
+            resizeMethod="resize"
+            imageStyle={{borderRadius: 10}}>
+            <TouchableOpacity
+              onPress={() => this.uploadProfilePic()}
+              style={{
+                flex: 1,
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}>
+              <Icon
+                type="MaterialCommunityIcons"
+                name="image-plus"
+                style={{color: '#e0e0e0', fontSize: 80}}
+              />
+            </TouchableOpacity>
+          </ImageBackground>
+        ) : (
+          <TouchableOpacity
+            onPress={() => this.uploadProfilePic()}
+            style={{
+              height: 250,
+              borderWidth: 2,
+              borderColor: 'lightgray',
+              borderStyle: 'dashed',
+              borderRadius: 10,
+              marginTop: 10,
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}>
+            <Icon
+              type="MaterialCommunityIcons"
+              name="image-plus"
+              style={{color: '#e0e0e0', fontSize: 80}}
+            />
+          </TouchableOpacity>
+        )}
+
+        <TextInput
+          style={styles.input}
+          value={this.state.title}
+          placeholder="Title e.g Delicous pounded yam"
+          onChangeText={(text) => this.setState({title: text})}
+          editable={this.state.coverImage ? true : false}
+        />
+        <Textarea
+          maxLength={160}
+          numberOfLines={3}
+          value={this.state.description}
+          style={styles.input}
+          onChangeText={(text) => this.setState({description: text})}
+          placeholder="describe your package"
+          disabled={!this.state.title ? true : false}
+        />
+
+        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+          <View>
+            <TextInput
+              keyboardType="numeric"
+              value={this.state.price}
+              style={styles.input}
+              editable={this.state.description ? true : false}
+              placeholder="How much does it cost ?"
+              onChangeText={(text) => this.setState({price: text})}
+            />
+          </View>
+          <View style={{flex: 1}}>
+            <Text
+              style={{
+                fontWeight: 'bold',
+                fontSize: 25,
+                alignSelf: 'center',
+                color: '#888',
+              }}>
+              ₦{formatAmountWithComma(this.state.price ? this.state.price : 0)}
+              .00
             </Text>
           </View>
         </View>
-        <View style={styles.container}>
-          <View style={styles.icoContainer}>
-            <TouchableNativeFeedback
-              onPress={() =>
-                this.setState({showModal: true}, () => {
-                  this.props.setLocationInputActive(true);
-                })
-              }>
-              <Image
-                style={styles.locationIcon}
-                resizeMethod="resize"
-                resizeMode="contain"
-                source={require('../../../assets/media/images/map.png')}
-              />
-            </TouchableNativeFeedback>
-          </View>
-          <View style={[styles.inputContainer]}>
-            <TextInput
-              ref={(ref) => (this.locationRef = ref)}
-              onFocus={() => this.props.setLocationInputActive(true)}
-              style={styles.input}
-              value={this.props.locationSearchString}
-              placeholder="Enter pick up location"
-              onChangeText={(text) => this.setPickUpLocation(text)}
-            />
-          </View>
-          <View style={styles.locationSelectorContainer}>
-            {this.props.pickUpLocation.address ? (
-              <Icon
-                style={styles.confirmIco}
-                type="AntDesign"
-                name="checkcircle"
-              />
-            ) : (
-              <Icon
-                style={[styles.confirmIco, {color: Colors.Brand.danger}]}
-                type="AntDesign"
-                name="closecircle"
-              />
-            )}
-          </View>
-          <View style={styles.spinnerContainer}>
-            {this.props.searchingLocation === 'started' && (
-              <Spinner style={styles.spinnerStyle} size={20} />
-            )}
-          </View>
-        </View>
 
-        <View style={styles.container}>
-          <View style={styles.icoContainer}>
-            <TouchableNativeFeedback
-              onPress={() =>
-                this.setState({showModal: true}, () => {
-                  this.props.setLocationInputActive(false);
-                })
-              }>
-              <Image
-                style={styles.locationIcon}
-                resizeMethod="resize"
-                resizeMode="contain"
-                source={require('../../../assets/media/images/map.png')}
-              />
-            </TouchableNativeFeedback>
-          </View>
-          <View style={styles.inputContainer}>
-            <TextInput
-              onChangeText={(text) => this.setDestinationLocation(text)}
-              style={styles.input}
-              value={this.props.destinationSearchString}
-              placeholder="Enter destination"
-              onFocus={() => this.props.setLocationInputActive(false)}
-            />
-          </View>
-          <View style={styles.locationSelectorContainer}>
-            {this.props.pickUpDestination.address ? (
-              <Icon
-                style={styles.confirmIco}
-                type="AntDesign"
-                name="checkcircle"
-              />
-            ) : (
-              <Icon
-                style={[styles.confirmIco, {color: Colors.Brand.danger}]}
-                type="AntDesign"
-                name="closecircle"
-              />
-            )}
-          </View>
-          <View style={styles.spinnerContainer}>
-            {this.props.searchingDestination === 'started' && (
-              <Spinner style={styles.spinnerStyle} size={20} />
-            )}
-          </View>
-        </View>
-
-        <FlatList
-          data={this.props.searchResults}
-          keyExtractor={(item) => item.placeID}
-          renderItem={({item}) => (
-            <TouchableOpacity
-              onPress={() => {
-                this.props.setLocation(item.placeID);
-              }}
-              style={[styles.container, styles.listItemExtended]}>
-              <View style={styles.icoContainer}>
-                <Icon type="EvilIcons" style={styles.ico} name="location" />
-              </View>
-              <View style={styles.inputContainer}>
-                <Text style={styles.locationSearchedString}>
-                  {item.fullText}
-                </Text>
-                <Text note>{item.primaryText}</Text>
-              </View>
-            </TouchableOpacity>
-          )}
-        />
-
-        {this.props.pickUpDestination.address &&
-          this.props.pickUpLocation.address && (
-            <Fab
-              active={true}
-              style={styles.fabBg}
-              position="bottomRight"
-              onPress={() => this.calculateCost()}>
-              <Icon
-                style={{color: Colors.Brand.brandColor}}
-                name="arrow-forward"
-              />
-            </Fab>
-          )}
-      </Container>
+        <Picker
+          placeholder="What type of item do you want to sell ? "
+          floatingPlaceholder
+          value={this.state.category}
+          enableModalBlur={false}
+          onChange={(item) => this.setState({category: item})}
+          topBarProps={{title: 'Categories'}}
+          showSearch
+          searchPlaceholder={'Search a category'}
+          searchStyle={{
+            color: Colors.blue30,
+            placeholderTextColor: Colors.grey50,
+          }}>
+          {_.map(formatCategories, (option) => (
+            <Picker.Item key={option.value} value={option} disabled={false} />
+          ))}
+        </Picker>
+        {this.state.category.value && this.state.price ? (
+          <Fab
+            active={true}
+            style={{left: 10}}
+            style={{backgroundColor: brandColors.brandColor}}
+            position="bottomRight"
+            onPress={() => this.post(this.state.coverImage)}>
+            <Icon style={{color: '#fff'}} name="check" type="Feather" />
+          </Fab>
+        ) : null}
+      </ScrollView>
     );
   }
 }

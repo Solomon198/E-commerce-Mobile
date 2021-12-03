@@ -1,437 +1,208 @@
+import {Alert} from 'react-native';
 import {
-  createParcel,
-  currentLocation,
-  inputActionType,
-  searchLocation,
-  setLocation,
-  cancelDeliveryActionType,
-  confirmDeliveryActionType,
-  AddCreditCard,
-  RemoveCreditCard,
-  GetCreditCards,
-  GetUsersParcel,
+  GetCategories,
+  GetFeeds,
+  GetUserPosts,
+  Post,
+  AddCart,
+  PaymentSuccess,
 } from '../../configs/global.enum';
+import {ToastAndroid} from 'react-native';
 
 const initialState = {
-  locationSearchString: '',
-  destinationSearchString: '',
-  locationInputActive: true,
+  feeds: [] as any[],
+  carts: [] as any[],
+  feedStatus: GetFeeds.GET_FEEDS_DEFAULT,
+  feedsError: '',
 
-  cardEmail: '',
+  posts: [] as any[],
+  postStatus: Post.POST_DEFAULT,
+  postError: '',
 
-  searchingLocation: searchLocation.SEARCH_LOCATION_DEFAULT,
-  searchingDestination: searchLocation.SEARCH_LOCATION_DEFAULT,
-  searchResults: [],
+  categories: [] as any[],
+  categoryStatus: GetCategories.GET_CATEGORIES_DEFAULT,
+  categoriesError: '',
 
-  pickUpLocation: {},
-  pickUpDestination: {},
-  deliveryDeleted: false,
-
-  currentLocation: [],
-  currentLocationStatus: currentLocation.GET_CUURENT_LOCATION_DEFAULT,
-
-  directionInfo: {},
-
-  userCards: null,
-  paymentMethod: 'cash',
-  addCardEnabled: false,
-  selectedCard: {},
-
-  paymentOptionsRenderer: 0,
-
-  variables: {},
-  createParcelStatus: createParcel.CREATE_PARCEL_DEFAULT,
-  cancelDeliveryStatus: cancelDeliveryActionType.CANCEL_DELIVERY_DEFAULT,
-  confirmDeliveryStatus: confirmDeliveryActionType.CONFIRM_DELIVERY_DEFAULT,
-
-  activeDelivery: null,
-  driver: null,
-  watchPosition: {longitude: 0, latitude: 0},
-  addCreditCardStatus: AddCreditCard.ADD_CREDIT_CARD_DEFAULT,
-  removeCreditCardStatus: RemoveCreditCard.REMOVE_CREDIT_CARD_DEFAULT,
-  getCreditCardStatus: GetCreditCards.GET_CREDIT_CARD_DEFAULT,
-  addCreditCardError: '',
-  removeCreditCardError: '',
-  getCreditCardError: '',
+  userPosts: [] as any[],
+  userPostStatus: GetUserPosts.GET_USER_POSTS_DEFAULT,
+  userPostError: '',
+  hasNextPage: true,
 
   page: 1,
-  gettingParcelStatus: GetUsersParcel.GET_PARCEL_DEFAULT,
-  errorGettingParcel: '',
-  parcels: [],
 };
 
 function UserReducer(state = initialState, action: any) {
   switch (action.type) {
-    case GetUsersParcel.GET_PARCEL_STARTED: {
-      state = {
-        ...state,
-        gettingParcelStatus: GetUsersParcel.GET_PARCEL_STARTED,
-        errorGettingParcel: '',
-      };
+    case PaymentSuccess.PAYMENT_SUCCESS: {
+      state = {...state, carts: []};
+      ToastAndroid.show('Order Placed successfully', 1000);
       return state;
     }
-
-    case GetUsersParcel.GET_PARCEL_FAILED: {
-      state = {
-        ...state,
-        gettingParcelStatus: GetUsersParcel.GET_PARCEL_FAILED,
-        errorGettingParcel: action.payload,
-      };
-      return state;
-    }
-
-    case GetUsersParcel.GET_PARCEL_SUCCESS: {
-      state = {
-        ...state,
-        gettingParcelStatus: GetUsersParcel.GET_PARCEL_SUCCESS,
-        errorGettingParcel: '',
-        parcels:
-          action.page !== 1
-            ? [...state.parcels, ...action.payload]
-            : action.payload,
-        page: action.payload.length === 0 ? action.page : action.page + 1,
-      };
-      return state;
-    }
-
-    case GetCreditCards.GET_CREDEIT_CARD_STARTED: {
-      state = {
-        ...state,
-        getCreditCardStatus: GetCreditCards.GET_CREDEIT_CARD_STARTED,
-      };
-      return state;
-    }
-
-    case GetCreditCards.GET_CREDIT_CARD_FAILED: {
-      state = {
-        ...state,
-        getCreditCardStatus: GetCreditCards.GET_CREDIT_CARD_FAILED,
-        getCreditCardError: action.payload,
-      };
-      return state;
-    }
-
-    case GetCreditCards.GET_CREDIT_CARD_SUCCESS: {
-      state = {
-        ...state,
-        getCreditCardStatus: GetCreditCards.GET_CREDIT_CARD_SUCCESS,
-        userCards: action.payload,
-      };
-      return state;
-    }
-
-    case RemoveCreditCard.REMOVE_CREDEIT_CARD_STARTED: {
-      state = {
-        ...state,
-        removeCreditCardStatus: RemoveCreditCard.REMOVE_CREDEIT_CARD_STARTED,
-      };
-      return state;
-    }
-
-    case RemoveCreditCard.REMOVE_CREDIT_CARD_FAILED: {
-      state = {
-        ...state,
-        removeCreditCardStatus: RemoveCreditCard.REMOVE_CREDIT_CARD_FAILED,
-        removeCreditCardError: action.payload,
-      };
-      return state;
-    }
-
-    case RemoveCreditCard.REMOVE_CREDIT_CARD_SUCCESS: {
-      state = {
-        ...state,
-        userCards: null as any,
-        removeCreditCardStatus: RemoveCreditCard.REMOVE_CREDIT_CARD_SUCCESS,
-      };
-      return state;
-    }
-
-    case AddCreditCard.ADD_CREDEIT_CARD_STARTED: {
-      state = {
-        ...state,
-        addCreditCardError: '',
-        addCreditCardStatus: AddCreditCard.ADD_CREDEIT_CARD_STARTED,
-      };
-      return state;
-    }
-
-    case AddCreditCard.ADD_CREDIT_CARD_FAILED: {
-      state = {
-        ...state,
-        addCreditCardStatus: AddCreditCard.ADD_CREDIT_CARD_FAILED,
-        addCreditCardError: action.payload,
-      };
-      return state;
-    }
-
-    case AddCreditCard.ADD_CREDIT_CARD_SUCCESS: {
-      state = {
-        ...state,
-        userCards: action.payload as any,
-        addCreditCardStatus: AddCreditCard.ADD_CREDIT_CARD_SUCCESS,
-      };
-      return state;
-    }
-
-    case inputActionType.SET_CARD_EMAIL: {
-      state = {...state, cardEmail: action.payload};
-      return state;
-    }
-
-    case inputActionType.SET_USER_CURRENT_LOCATION: {
-      state = {...state, watchPosition: action.payload};
-      return state;
-    }
-    case cancelDeliveryActionType.CANCEL_DELIVERY_STARTED: {
-      state = {
-        ...state,
-        cancelDeliveryStatus: cancelDeliveryActionType.CANCEL_DELIVERY_STARTED,
-      };
-      return state;
-    }
-
-    case cancelDeliveryActionType.CANCEL_DELIVERY_FAILED: {
-      state = {
-        ...state,
-        cancelDeliveryStatus: cancelDeliveryActionType.CANCEL_DELIVERY_FAILED,
-      };
-      return state;
-    }
-
-    case cancelDeliveryActionType.CANCEL_DELIVERY_SUCCESS: {
-      state = {
-        ...state,
-        cancelDeliveryStatus: cancelDeliveryActionType.CANCEL_DELIVERY_SUCCESS,
-      };
-      return state;
-    }
-
-    case confirmDeliveryActionType.CONFIRM_DELIVERY_STARTED: {
-      state = {
-        ...state,
-        confirmDeliveryStatus:
-          confirmDeliveryActionType.CONFIRM_DELIVERY_STARTED,
-      };
-      return state;
-    }
-
-    case confirmDeliveryActionType.CONFIRM_DELIVERY_FAILED: {
-      state = {
-        ...state,
-        confirmDeliveryStatus:
-          confirmDeliveryActionType.CONFIRM_DELIVERY_FAILED,
-      };
-      return state;
-    }
-
-    case confirmDeliveryActionType.CONFIRM_DELIVERY_SUCCESS: {
-      state = {
-        ...state,
-        confirmDeliveryStatus:
-          confirmDeliveryActionType.CONFIRM_DELIVERY_SUCCESS,
-      };
-      return state;
-    }
-
-    case inputActionType.SET_TRACK_ACTIVE_DELIVERY: {
-      if (action.payload) {
-        state = {
-          ...state,
-          activeDelivery: action.payload,
-          driver: action.driver,
-          deliveryDeleted: false,
-        };
-      } else {
-        if (state.activeDelivery && !action.discard) {
-          state = {
-            ...state,
-            deliveryDeleted: true,
-            driver: null,
-          };
-        } else {
-          state = {
-            ...state,
-            activeDelivery: action.payload,
-            driver: null,
-            deliveryDeleted: false,
-          };
+    case AddCart.ADD_TO_CART: {
+      const carts = Object.assign([] as any[], state.carts) as any[];
+      let itemExist = false;
+      carts.forEach((item, index) => {
+        if (item.postId === action.payload.postId) {
+          if (action.isAdding) {
+            item.count += 1;
+            itemExist = true;
+            ToastAndroid.show('Item Added to cart', 1000);
+          } else {
+            if (item.count > 1) {
+              item.count -= 1;
+            } else {
+              carts.splice(index, 1);
+            }
+            itemExist = true;
+            ToastAndroid.show('Item Removed from cart', 1000);
+          }
         }
+      });
+      if (!itemExist && action.isAdding) {
+        ToastAndroid.show('Item Added to cart', 1000);
+
+        let payload = action.payload;
+        payload.count = 1;
+        carts.push(payload);
       }
-      return state;
-    }
-    case createParcel.CREATE_PARCEL_STARTED: {
+
       state = {
         ...state,
-        createParcelStatus: createParcel.CREATE_PARCEL_STARTED,
+        carts,
+      };
+      return state;
+    }
+    case GetUserPosts.GET_USER_POSTS_STARTED: {
+      state = {
+        ...state,
+        userPostStatus: GetUserPosts.GET_USER_POSTS_STARTED,
+        userPostError: '',
       };
       return state;
     }
 
-    case createParcel.CREATE_PARCEL_FAILED: {
+    case GetUserPosts.GET_USER_POSTS_FAILED: {
       state = {
         ...state,
-        createParcelStatus: createParcel.CREATE_PARCEL_FAILED,
+        userPostStatus: GetUserPosts.GET_USER_POSTS_FAILED,
+        userPostError: action.payload,
       };
       return state;
     }
 
-    case createParcel.CREATE_PARCEL_SUCCESS: {
+    case GetUserPosts.GET_USER_POSTS_SUCCESS: {
       state = {
         ...state,
-        createParcelStatus: createParcel.CREATE_PARCEL_SUCCESS,
+        userPostStatus: GetUserPosts.GET_USER_POSTS_SUCCESS,
+        userPostError: '',
+        userPosts: action.payload,
       };
       return state;
     }
 
-    case inputActionType.SET_VARIABLES: {
-      state = {...state, variables: action.payload};
+    case Post.POST_STARTED: {
+      state = {...state, postStatus: Post.POST_STARTED, postError: ''};
       return state;
     }
-
-    case inputActionType.SET_CHANGE_PAYMENT_METHOD: {
+    case Post.POST_FAILED: {
       state = {
         ...state,
-        paymentMethod: action.payload as string,
-        selectedCard: action.card,
+        postStatus: Post.POST_FAILED,
+        postError: action.payload,
       };
       return state;
     }
 
-    case inputActionType.SET_ENABLE_ADD_BUTTON: {
-      state = {...state, addCardEnabled: action.payload};
-      return state;
-    }
+    case Post.POST_SUCCESS: {
+      if (action.isUpdate) {
+        const feeds = state.feeds.map((feed) => {
+          if (feed.postId === action.payload.postId) {
+            return action.payload;
+          } else {
+            return feed;
+          }
+        });
 
-    case inputActionType.SET_DURATION_AND_DISTANCE_CALLER: {
-      state = {...state, directionInfo: action.payload};
-      return state;
-    }
-
-    case currentLocation.GET_CUURENT_LOCATION_STARTED: {
-      state = {
-        ...state,
-        currentLocationStatus: currentLocation.GET_CUURENT_LOCATION_STARTED,
-      };
-      return state;
-    }
-
-    case currentLocation.GET_CUURENT_LOCATION_FAILED: {
-      state = {
-        ...state,
-        currentLocationStatus: currentLocation.GET_CUURENT_LOCATION_FAILED,
-      };
-      return state;
-    }
-
-    case currentLocation.GET_CUURENT_LOCATION_SUCCESS: {
-      console.log(action.payload);
-      state = {
-        ...state,
-        currentLocationStatus: currentLocation.GET_CUURENT_LOCATION_SUCCESS,
-        currentLocation: action.payload,
-      };
-      return state;
-    }
-
-    case inputActionType.SET_RESET_INPUTS: {
-      state = {
-        ...state,
-
-        locationSearchString: '',
-        destinationSearchString: '',
-        locationInputActive: true,
-
-        searchingLocation: searchLocation.SEARCH_LOCATION_DEFAULT,
-        searchingDestination: searchLocation.SEARCH_LOCATION_DEFAULT,
-        searchResults: [],
-
-        pickUpLocation: {},
-        pickUpDestination: {},
-
-        directionInfo: {},
-      };
-
-      return state;
-    }
-
-    case setLocation.SET_LOCATION_SUCCESS: {
-      if (state.locationInputActive) {
         state = {
           ...state,
-          pickUpLocation: action.payload,
-          searchingLocation: searchLocation.SEARCH_LOCATION_SUCCESS,
-          locationSearchString: action.payload.address,
+          postStatus: Post.POST_SUCCESS,
+          postError: '',
+          feeds: [...feeds],
         };
       } else {
         state = {
           ...state,
-          pickUpDestination: action.payload,
-          searchingDestination: searchLocation.SEARCH_LOCATION_SUCCESS,
-          destinationSearchString: action.payload.address,
+          postStatus: Post.POST_SUCCESS,
+          postError: '',
+          posts: [action.payload, ...state.posts],
+          feeds: [action.payload, ...state.feeds],
         };
       }
-
       return state;
     }
 
-    case searchLocation.SEARCH_LOCATION_STARTED: {
-      if (state.locationInputActive) {
-        state = {
-          ...state,
-          searchingLocation: searchLocation.SEARCH_LOCATION_STARTED,
-        };
+    case GetCategories.GET_CATEGORIES_STARTED: {
+      state = {
+        ...state,
+        categoryStatus: GetCategories.GET_CATEGORIES_STARTED,
+        categoriesError: '',
+      };
+      return state;
+    }
+
+    case GetCategories.GET_CATEGORIES_FAILED: {
+      state = {
+        ...state,
+        categoryStatus: GetCategories.GET_CATEGORIES_FAILED,
+        categoriesError: action.payload,
+      };
+      return state;
+    }
+
+    case GetCategories.GET_CATEGORIES_SUCCESS: {
+      state = {
+        ...state,
+        categoryStatus: GetCategories.GET_CATEGORIES_SUCCESS,
+        categoriesError: '',
+        categories: action.payload,
+      };
+      return state;
+    }
+
+    case GetFeeds.GET_FEEDS_STARTED: {
+      state = {
+        ...state,
+        feedStatus: GetFeeds.GET_FEEDS_STARTED,
+        feedsError: '',
+      };
+      return state;
+    }
+
+    case GetFeeds.GET_FEEDS_FAILED: {
+      state = {
+        ...state,
+        feedStatus: GetFeeds.GET_FEEDS_FAILED,
+        feedsError: action.payload,
+      };
+      return state;
+    }
+
+    case GetFeeds.GET_FEEDS_SUCCESS: {
+      state = {
+        ...state,
+        feedStatus: GetFeeds.GET_FEEDS_SUCCESS,
+        feedsError: '',
+      };
+      if (action.isRefresh) {
+        state = {...state, feeds: action.payload, page: 2};
       } else {
         state = {
           ...state,
-          searchingDestination: searchLocation.SEARCH_LOCATION_STARTED,
+          feeds: [...state.feeds, ...action.payload],
+          page: state.page + 1,
+          hasNextPage: action.hasNextPage,
         };
       }
-      return state;
-    }
-
-    case searchLocation.SEARCH_LOCATION_SUCCESS: {
-      if (state.locationInputActive) {
-        state = {
-          ...state,
-          searchingLocation: searchLocation.SEARCH_LOCATION_SUCCESS,
-          searchResults: action.payload,
-        };
-      } else {
-        state = {
-          ...state,
-          searchingDestination: searchLocation.SEARCH_LOCATION_SUCCESS,
-          searchResults: action.payload,
-        };
-      }
-      return state;
-    }
-    case searchLocation.SEARCH_LOCATION_FAILED: {
-      if (state.locationInputActive) {
-        state = {
-          ...state,
-          searchingLocation: searchLocation.SEARCH_LOCATION_FAILED,
-        };
-      } else {
-        state = {
-          ...state,
-          searchingDestination: searchLocation.SEARCH_LOCATION_FAILED,
-        };
-      }
-      return state;
-    }
-
-    case inputActionType.SET_PARCEL_LOCATION: {
-      state = {...state, locationSearchString: action.payload};
-      return state;
-    }
-
-    case inputActionType.SET_PARCEL_DESITINATION: {
-      state = {...state, destinationSearchString: action.payload};
-      return state;
-    }
-
-    case inputActionType.SET_LOCATION_ACTIVE: {
-      state = {...state, locationInputActive: action.payload};
       return state;
     }
   }

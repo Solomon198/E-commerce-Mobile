@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@react-native-community/blur": "^3.6.0",
+    "@react-native-community/datetimepicker": "^4.0.0",
     "@react-native-community/netinfo": "^6.0.0",
     "@react-native-community/viewpager": "^5.0.11",
     "@react-native-firebase/app": "^13.0.1",
@@ -19,8 +20,10 @@
     "@react-native-firebase/firestore": "^13.0.1",
     "@react-native-firebase/messaging": "^13.0.1",
     "@react-native-firebase/storage": "^13.0.1",
+    "@types/lodash": "^4.14.177",
     "axios": "^0.21.1",
     "geofire-common": "^5.2.0",
+    "lodash": "^4.17.21",
     "native-base": "^2.15.2",
     "react": "16.13.1",
     "react-native": "0.63.4",

@@ -1,6 +1,25 @@
 import React from 'react';
-import {View, StyleSheet, TouchableOpacity, Modal, Alert} from 'react-native';
-import {H1, Container, H2, Body, Icon, Header, Button, Left} from 'native-base';
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  Modal,
+  Alert,
+  ImageBackground,
+  StatusBar,
+} from 'react-native';
+import {
+  H1,
+  Container,
+  H2,
+  Body,
+  Icon,
+  Header,
+  Button,
+  Left,
+  Text,
+  Fab,
+} from 'native-base';
 import Colors from '../../configs/styles/index';
 import {Navigation} from 'react-native-navigation';
 import {connect} from 'react-redux';
@@ -15,6 +34,7 @@ import {appUrl, firebasePaths} from '../../configs/globals.config';
 import {inputActionType} from '../../configs/global.enum';
 import axios from 'axios';
 import crashlytics from '@react-native-firebase/crashlytics';
+import NavigationScreens from '../../../nav.config/navigation.screens';
 
 const firebaseStorage = storage;
 
@@ -35,9 +55,18 @@ const mapDispatchStateToProps = (dispatch: any) => ({
 });
 
 const styles = StyleSheet.create({
+  labelProfileItems: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    marginTop: 5,
+  },
   mainContainer: {
-    backgroundColor: '#f4f4f4',
+    backgroundColor: '#fff',
     flex: 1,
+  },
+  fab: {
+    backgroundColor: '#fff',
+    zIndex: 10000,
   },
   input: {
     borderColor: '#e8e8e8',
@@ -66,11 +95,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: Colors.Brand.brandColor,
   },
-  header: {backgroundColor: '#f4f4f4'},
+  header: {backgroundColor: 'transparent'},
   headerLeft: {maxWidth: 50},
   avatarContainer: {
-    alignContent: 'center',
-    alignItems: 'center',
+    flex: 1,
+    marginHorizontal: 20,
     justifyContent: 'center',
   },
   uploadImageTouchableView: {
@@ -78,23 +107,39 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     alignContent: 'center',
-    width: 40,
-    height: 40,
+    width: 50,
+    height: 50,
     borderRadius: 100,
     borderWidth: 1,
     borderColor: '#999',
-    position: 'absolute',
-    right: 100,
+    margin: 20,
+    alignSelf: 'flex-end',
   },
-  userName: {marginTop: 10, color: '#555'},
+  userName: {marginTop: 15, color: '#444', fontWeight: 'bold'},
   userEmail: {fontSize: 15},
   userPhoneNumber: {
     color: Colors.Brand.brandColor,
     fontFamily: 'sans-serif-light',
-    fontSize: 20,
-    backgroundColor: '#f9f9f9',
-    padding: 10,
+    fontSize: 14,
     borderRadius: 20,
+    fontWeight: '900',
+    marginTop: 3,
+  },
+  actionsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  accountActions: {
+    backgroundColor: '#f4f4f4',
+    width: 60,
+    height: 60,
+    borderRadius: 100,
+    borderWidth: 1,
+    borderColor: '#e8e8e8',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 
@@ -201,23 +246,51 @@ class Profile extends React.Component<Props> {
   render() {
     return (
       <Container style={styles.mainContainer}>
+        <StatusBar translucent />
         {this.renderUploader()}
-        <Header
-          androidStatusBarColor={Colors.Brand.brandColor}
-          hasTabs
-          style={styles.header}>
-          <Left style={styles.headerLeft}>
-            <Button onPress={() => this.goBack()} dark transparent>
-              <Icon
-                name="arrow-back"
-                style={{color: Colors.Brand.brandColor}}
-              />
-            </Button>
-          </Left>
-          <Body />
-        </Header>
+        <View style={{flex: 2}}>
+          <Fab
+            active={true}
+            style={styles.fab}
+            position="topLeft"
+            onPress={() => this.goBack()}>
+            <Icon style={{color: Colors.Brand.brandColor}} name="arrow-back" />
+          </Fab>
+          <ImageBackground
+            resizeMethod="resize"
+            resizeMode="cover"
+            style={{flex: 1}}
+            imageStyle={{borderRadius: 15, margin: 2}}
+            source={
+              this.props.user.photo
+                ? {uri: this.props.user.photo}
+                : getDefaultProfilePicture(this.props.user.gender)
+            }>
+            {/* <Header
+              translucent
+              androidStatusBarColor={Colors.Brand.brandColor}
+              hasTabs
+              style={styles.header}>
+              <Left style={styles.headerLeft}>
+                <Button onPress={() => this.goBack()} dark transparent>
+                  <Icon
+                    name="arrow-back"
+                    style={{color: Colors.Brand.brandColor}}
+                  />
+                </Button>
+              </Left>
+              <Body />
+            </Header> */}
+            <View style={{flex: 1}} />
+            <TouchableOpacity
+              onPress={() => this.uploadProfilePic()}
+              style={styles.uploadImageTouchableView}>
+              <Icon name="camera" style={{color: Colors.Brand.brandColor}} />
+            </TouchableOpacity>
+          </ImageBackground>
+        </View>
         <View style={styles.avatarContainer}>
-          <Avatar
+          {/* <Avatar
             onPress={() => ''}
             size={150}
             source={
@@ -225,19 +298,62 @@ class Profile extends React.Component<Props> {
                 ? {uri: this.props.user.photo}
                 : getDefaultProfilePicture(this.props.user.gender)
             }
-          />
-          <TouchableOpacity
-            onPress={() => this.uploadProfilePic()}
-            style={styles.uploadImageTouchableView}>
-            <Icon name="camera" style={{color: Colors.Brand.brandColor}} />
-          </TouchableOpacity>
+          /> */}
+
           <H1 style={styles.userName}>
             {this.props.user.firtName + ' ' + this.props.user.lastName}
           </H1>
 
-          <H2 style={styles.userEmail}>{this.props.user.email}</H2>
-
           <H2 style={styles.userPhoneNumber}>{this.props.user.phoneNumber}</H2>
+          <View style={styles.actionsContainer}>
+            <TouchableOpacity
+              onPress={() =>
+                Navigation.push(this.props.componentId, {
+                  component: {
+                    id: NavigationScreens.PARCEL_MANAGER_SCREEN,
+                    name: NavigationScreens.PARCEL_MANAGER_SCREEN,
+                  },
+                })
+              }
+              style={{justifyContent: 'center', alignItems: 'center'}}>
+              <View style={styles.accountActions}>
+                <Icon
+                  name="th-list"
+                  type="FontAwesome"
+                  style={{color: Colors.Brand.brandColor}}
+                />
+              </View>
+              <Text style={styles.labelProfileItems}>My items</Text>
+            </TouchableOpacity>
+            <View style={{justifyContent: 'center', alignItems: 'center'}}>
+              <View style={styles.accountActions}>
+                <Icon
+                  name="shopping-cart"
+                  type="Feather"
+                  style={{color: Colors.Brand.brandColor}}
+                />
+              </View>
+              <Text style={styles.labelProfileItems}>orders</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() =>
+                Navigation.push(this.props.componentId, {
+                  component: {
+                    id: NavigationScreens.CREATE_PARCEL_SCREEN,
+                    name: NavigationScreens.CREATE_PARCEL_SCREEN,
+                  },
+                })
+              }
+              style={{justifyContent: 'center', alignItems: 'center'}}>
+              <View style={styles.accountActions}>
+                <Icon
+                  name="md-add-outline"
+                  style={{color: Colors.Brand.brandColor}}
+                />
+              </View>
+              <Text style={styles.labelProfileItems}>New Item</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Container>
     );
